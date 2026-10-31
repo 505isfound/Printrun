@@ -38,17 +38,18 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
     standalone_mode = extra_buttons is not None
     base_line = 1 if standalone_mode else 2
 
+    # One extra row (base_line + 2) holds the one-click material preheat buttons
     if standalone_mode:
-        gauges_base_line = base_line + 10
+        gauges_base_line = base_line + 11
     elif mini_mode and root.display_graph:
-        gauges_base_line = base_line + 7
+        gauges_base_line = base_line + 8
     else:
-        gauges_base_line = base_line + 6
+        gauges_base_line = base_line + 7
     tempdisp_line = gauges_base_line + (2 if root.display_gauges else 0)
     if mini_mode and root.display_graph:
-        e_base_line = base_line + 3
+        e_base_line = base_line + 4
     else:
-        e_base_line = base_line + 2
+        e_base_line = base_line + 3
 
     pos_mapping = {
         "htemp_label": (base_line + 0, 0),
@@ -59,6 +60,7 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
         "btemp_off": (base_line + 1, 2),
         "btemp_val": (base_line + 1, 3),
         "btemp_set": (base_line + 1, 4),
+        "presets": (base_line + 2, 0),
         "ebuttons": (e_base_line + 0, 0),
         "esettings": (e_base_line + 1, 0),
         "speedcontrol": (e_base_line + 2, 0),
@@ -79,6 +81,7 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
         "btemp_off": (1, 1),
         "btemp_val": (1, 1),
         "btemp_set": (1, 1 if root.display_graph else 2),
+        "presets": (1, 5 if root.display_graph else 6),
         "ebuttons": (1, 5 if root.display_graph else 6),
         "esettings": (1, 5 if root.display_graph else 6),
         "speedcontrol": (1, 5 if root.display_graph else 6),
@@ -91,14 +94,14 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
     }
 
     if standalone_mode:
-        pos_mapping["tempgraph"] = (base_line + 6, 0)
+        pos_mapping["tempgraph"] = (base_line + 7, 0)
         span_mapping["tempgraph"] = (3, 2)
     elif mini_mode:
-        pos_mapping["tempgraph"] = (base_line + 2, 0)
+        pos_mapping["tempgraph"] = (base_line + 3, 0)
         span_mapping["tempgraph"] = (1, 5)
     else:
         pos_mapping["tempgraph"] = (base_line + 0, 5)
-        span_mapping["tempgraph"] = (5, 1)
+        span_mapping["tempgraph"] = (6, 1)
 
     if mini_mode:
         pos_mapping["etool_label"] = (0, 0)
@@ -170,6 +173,48 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
 
     set_labeled(root.settings.last_bed_temperature, root.bedtemps, root.btemp)
     set_labeled(root.settings.last_temperature, root.temps, root.htemp)
+
+    # One-click material presets + quick actions #
+    presetpanel = root.newPanel(parentpanel)
+    presetcol = wx.BoxSizer(wx.VERTICAL)
+
+    presetsizer = wx.BoxSizer(wx.HORIZONTAL)
+    presetsizer.Add(wx.StaticText(presetpanel, -1, _("Preheat:")), flag = wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border = 5)
+    for material in ("PLA", "PETG", "ABS"):
+        btn = make_button(presetpanel, material, lambda e, m = material: root.preheat(m),
+                          _("Heat nozzle to %s and bed to %s") % (root.temps.get(material, "?"), root.bedtemps.get(material, "?")),
+                          style = wx.BU_EXACTFIT)
+        root.printerControls.append(btn)
+        presetsizer.Add(btn, 1, flag = wx.EXPAND | wx.RIGHT, border = 3)
+    presetcol.Add(presetsizer, 0, wx.EXPAND)
+
+    # Dedicated quick-action buttons
+    actions = (
+        ("stopprintbtn", _("Stop print"), root.stop_print_only,
+         _("Pause the print only. Heaters, fan and motors are left alone. Press Resume to continue."), "#FFD27F", "#5A3A00"),
+        ("heatersoffbtn", _("Heaters off"), root.heaters_off,
+         _("Turn the nozzle and bed heaters off"), None, None),
+        ("motorsoffbtn", _("Motors off"), root.motors_off,
+         _("Turn the stepper motors off so the axes move freely by hand"), None, None),
+        ("clearfilebtn", _("Clear file"), root.clear_print_file,
+         _("Unload the current print file"), None, None),
+        ("clearallbtn", _("Clear all"), root.clear_everything,
+         _("Cancel the print, turn off heaters, fan and motors, and unload the file"), "#E06666", "white"),
+    )
+    actionsizer = wx.WrapSizer(wx.HORIZONTAL)
+    for attr, label, cb, tip, bg, fg in actions:
+        btn = make_button(presetpanel, label, cb, tip, style = wx.BU_EXACTFIT)
+        if bg:
+            btn.SetBackgroundColour(bg)
+            btn.SetForegroundColour(fg)
+        setattr(root, attr, btn)
+        if attr != "clearfilebtn":  # clearing the file works offline too
+            root.printerControls.append(btn)
+        actionsizer.Add(btn, 0, flag = wx.RIGHT | wx.TOP, border = 3)
+    presetcol.Add(actionsizer, 0, wx.EXPAND)
+
+    presetpanel.SetSizer(presetcol)
+    add("presets", presetpanel, flag = wx.EXPAND)
 
     # Speed control #
     speedpanel = root.newPanel(parentpanel)

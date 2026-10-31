@@ -29,6 +29,7 @@ install_locale('pronterface')
 from .controls import ControlsSizer, add_extra_controls
 from .viz import VizPane
 from .log import LogPane
+from .widgets import StatusPanel
 from .toolbar import MainToolbar
 
 class ToggleablePane(wx.BoxSizer):
@@ -275,6 +276,12 @@ class MainWindow(wx.Frame):
         else:
             self.lowersizer.Add(rightpanel, 1, wx.EXPAND)
         self.mainsizer.Add(upperpanel, 0, wx.EXPAND)
+        if self.settings.statuspanel:
+            self.statuspanel = StatusPanel(self.panel, self.bgcolor)
+            self.registerPanel(self.statuspanel)
+            self.mainsizer.Add(self.statuspanel, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 4)
+        else:
+            self.statuspanel = None
         self.mainsizer.Add(lowerpanel, 1, wx.EXPAND)
         self.panel.SetSizer(self.mainsizer)
         self.panel.Bind(wx.EVT_MOUSE_EVENTS, self.editbutton)

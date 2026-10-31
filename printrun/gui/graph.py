@@ -167,7 +167,7 @@ class Graph(BufferedCanvas):
 
         if not self.timer.IsRunning():
             font = wx.Font(14, wx.DEFAULT, wx.NORMAL, wx.BOLD)
-            gc.SetFont(font, wx.Colour(3, 4, 4))
+            gc.SetFont(font, wx.Colour(self.root.settings.graph_color_text))
             gc.DrawText("Graph offline",
                         self.width / 2 - font.GetPointSize() * 3,
                         self.height / 2 - font.GetPointSize() * 1)

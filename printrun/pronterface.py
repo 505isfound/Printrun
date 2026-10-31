@@ -206,6 +206,9 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.gui_set_disconnected()
         self.statusbar = self.CreateStatusBar()
         self.statusbar.SetStatusText(_("Not connected to printer."))
+        if self.settings.theme == "Dark":
+            self.statusbar.SetBackgroundColour(self.bgcolor)
+            self.statusbar.SetForegroundColour(wx.Colour("#E6E6E6"))
 
         self.t = ConsoleOutputHandler(self.catchprint, self.settings.log_path, self.settings.log_stdout)
         self.stdout = sys.stdout
@@ -292,6 +295,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         # Set gcview parameters here as they don't get set when viewers are
         # created
         self.update_gcview_params()
+        self.apply_text_theme()
 
         # Finalize
         if self.p.online:
@@ -340,6 +344,11 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         Multiple settings changes may cause the UI to reload repeatedly.
         Therefore, we wait 1 ms to collect any consecutive calls.
         """
+        if not self.window_ready:
+            # Settings loaded at startup: the first UI build already uses
+            # them. Scheduling a rebuild here tore down the fresh UI right
+            # after creation ("Gviz has been deleted" errors in the log).
+            return
         if not self.ui_reload_timeout or self.ui_reload_timeout.HasRun():
             self.ui_reload_timeout = wx.CallLater(1, self.reload_ui)
             return
@@ -384,14 +393,38 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     def closewin(self, e):
         e.StopPropagation()
+        # Ask BEFORE touching the printer. Previously the heaters were
+        # switched off and the printer disconnected first, and only then
+        # was the user asked -- so answering "No" could not save the print.
+        if (self.p.printing or self.p.paused) and e.CanVeto():
+            dlg = wx.MessageDialog(self, _("A print is in progress.\n\nClosing Pronterface will stop sending the print to the printer.\nThe heaters will be left as they are.\n\nClose anyway?"), _("Exit"), wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING)
+            answer = dlg.ShowModal()
+            dlg.Destroy()
+            if answer != wx.ID_YES:
+                e.Veto()
+                return
+        self.exit_confirmed = True
         self.do_exit("force")
+
+    def do_exit(self, l):
+        # Leave the heaters alone on exit unless the user turned the
+        # "Turn heaters off when closing" option on.
+        if self.settings.heaters_off_on_exit and self.p.online:
+            self.log(_("Turning heaters off"))
+            self.p.send_now("M104 S0.0")
+            if self.status.bed_enabled:
+                self.p.send_now("M140 S0.0")
+        self.log(_("Disconnecting from printer..."))
+        self.p.disconnect()
+        self.kill()
+        sys.exit()
 
     def kill(self, e=None):
         if len(self.commandbox.history):
             # save current command box history
             write_history_to(self.history_file, self.commandbox.history)
 
-        if self.p.printing or self.p.paused:
+        if (self.p.printing or self.p.paused) and not getattr(self, "exit_confirmed", False):
             dlg = wx.MessageDialog(self, _("Print in progress ! Are you really sure you want to quit ?"), _("Exit"), wx.YES_NO | wx.ICON_WARNING)
             if dlg.ShowModal() == wx.ID_NO:
                 return
@@ -411,6 +444,62 @@ class PronterWindow(MainWindow, pronsole.pronsole):
             self.excluder.close_window()
         wx.CallAfter(self.gwindow.Destroy)
         wx.CallAfter(self.Destroy)
+
+    THEME_COLORS = {
+        "Dark": {
+            "bgcolor": "#2B2D30",
+            "graph_color_background": "#1E1F22",
+            "graph_color_text": "#DDDDDD",
+            "graph_color_grid": "#4A4A4A",
+            "gcview_color_background": "#1E1F22FF",
+            "graph_color_fan": "#BBBBBB80",
+            "graph_color_ex0target": "#6E9BFF80",
+        },
+        "Light": {
+            "bgcolor": None,  # system default
+            "graph_color_background": "#FAFAC7",
+            "graph_color_text": "#172C2C",
+            "graph_color_grid": "#5A5A5A",
+            "gcview_color_background": "#FAFAC7FF",
+            "graph_color_fan": "#00000080",
+            "graph_color_ex0target": "#0005FF80",
+        },
+    }
+
+    def apply_theme(self, key = None, value = None):
+        """Switch the color settings to match the chosen theme."""
+        if self.processing_rc or self.processing_args:
+            # Colors were saved alongside the theme; don't overwrite them
+            return
+        colors = self.THEME_COLORS.get(value or self.settings.theme, {})
+        for name, color in colors.items():
+            if color is None:
+                color = self._preferred_bgcolour_hex()
+            self.set(name, color)
+        self.on_ui_reload()
+
+    def apply_text_theme(self):
+        """In dark mode, recolor text and input boxes so they stay readable."""
+        self.panel.SetBackgroundColour(self.bgcolor)
+        if self.settings.theme != "Dark":
+            return
+        fg = wx.Colour("#E6E6E6")
+        field_bg = wx.Colour("#1E1F22")
+
+        def walk(widget):
+            for child in widget.GetChildren():
+                if isinstance(child, (wx.StaticText, wx.CheckBox, wx.RadioButton, wx.StaticBox)):
+                    child.SetForegroundColour(fg)
+                elif isinstance(child, (wx.TextCtrl, wx.ComboBox, wx.SpinCtrl, wx.SpinCtrlDouble, wx.Choice)):
+                    child.SetBackgroundColour(field_bg)
+                    child.SetForegroundColour(fg)
+                walk(child)
+        walk(self.panel)
+        statusbar = getattr(self, "statusbar", None)
+        if statusbar:
+            statusbar.SetBackgroundColour(self.bgcolor)
+            statusbar.SetForegroundColour(fg)
+        self.panel.Refresh()
 
     @property
     def bgcolor(self):
@@ -491,6 +580,124 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                 self.logError(_("You cannot set negative temperatures. To turn the bed off entirely, set its temperature to 0."))
         except Exception as x:
             self.logError(_("You must enter a temperature. (%s)") % (repr(x),))
+
+    def preheat(self, material):
+        """Set nozzle and bed together from a material preset ("Off" = cool down)."""
+        if not self.p.online:
+            self.logError(_("Printer is not online."))
+            return
+        if material == "Off":
+            self.do_settemp("0")
+            self.do_bedtemp("0")
+            return
+        self.log(_("Preheating for %s") % material)
+        self.do_settemp(self.temps[material])
+        self.do_bedtemp(self.bedtemps[material])
+
+    #  --------------------------------------------------------------
+    #  Quick actions (dedicated buttons)
+    #  --------------------------------------------------------------
+
+    def _confirm_during_print(self, what):
+        """Ask before doing something that would ruin a running print."""
+        if not (self.p.printing or self.sdprinting) or self.paused:
+            return True
+        dlg = wx.MessageDialog(self, _("A print is running.\n\n%s now will ruin the print.\n\nDo it anyway?") % what,
+                               _("Print in progress"), wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING)
+        answer = dlg.ShowModal()
+        dlg.Destroy()
+        return answer == wx.ID_YES
+
+    def stop_print_only(self, event = None):
+        """Pause the print and do nothing else: heaters, fans and motors
+        are left alone and no pause script is run. Resume continues it."""
+        if self.paused:
+            self.log(_("Print is already stopped. Use Resume to continue."))
+            return
+        if self.sdprinting:
+            self.p.send_now("M25")
+        elif self.p.printing:
+            self.p.pause()
+        else:
+            self.log(_("Nothing is printing."))
+            return
+        self.paused = True
+        self.extra_print_time += int(time.time() - self.starttime)
+        self.log(_("Print stopped at: %s (heaters and motors untouched; press Resume to continue)") % format_time(time.time()))
+        wx.CallAfter(self.pausebtn.SetLabel, _("Resume"))
+        wx.CallAfter(self.toolbarsizer.Layout)
+
+    def heaters_off(self, event = None):
+        if not self.p.online:
+            self.logError(_("Printer is not online."))
+            return
+        if not self._confirm_during_print(_("Turning the heaters off")):
+            return
+        if self.settings.extruders > 1:
+            for tool in range(self.settings.extruders):
+                self.p.send_now("M104 T%d S0" % tool)
+        self.do_settemp("0")
+        self.do_bedtemp("0")
+
+    def motors_off(self, event = None):
+        if not self.p.online:
+            self.logError(_("Printer is not online."))
+            return
+        if not self._confirm_during_print(_("Turning the motors off")):
+            return
+        self.p.send_now("M84")
+        self.log(_("Motors off"))
+
+    def clear_print_file(self, event = None):
+        if self.p.printing or self.sdprinting or self.paused:
+            self.logError(_("Can't clear the file while a print is running or stopped. Use Clear all instead."))
+            return
+        self._unload_file()
+
+    def _unload_file(self):
+        self.fgcode = None
+        self.filename = None
+        self.printbtn.Disable()
+        self.printbtn.SetLabel(_("&Print"))
+        self.pausebtn.Disable()
+        self.pausebtn.SetLabel(_("&Pause"))
+        try:
+            self.gviz.clear()
+            self.gwindow.p.clear()
+            self.gviz.Refresh()
+        except Exception:
+            logging.debug(traceback.format_exc())
+        self.toolbarsizer.Layout()
+        self.log(_("Print file cleared."))
+        self.update_statuspanel_progress()
+
+    def clear_everything(self, event = None):
+        """Cancel the print, heaters off, fan off, motors off, unload the file."""
+        if (self.p.printing or self.sdprinting) and not self.paused:
+            dlg = wx.MessageDialog(self, _("A print is running.\n\nClear all will cancel the print, turn off heaters, fan and motors, and unload the file.\n\nDo it anyway?"),
+                                   _("Clear all"), wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING)
+            answer = dlg.ShowModal()
+            dlg.Destroy()
+            if answer != wx.ID_YES:
+                return
+        if self.p.online:
+            if self.sdprinting:
+                self.p.send_now("M25")
+            elif self.p.printing or self.paused:
+                self.p.cancelprint()
+            self.paused = False
+            self.sdprinting = False
+            if self.settings.extruders > 1:
+                for tool in range(self.settings.extruders):
+                    self.p.send_now("M104 T%d S0" % tool)
+            self.p.send_now("M104 S0")
+            self.p.send_now("M140 S0")
+            self.p.send_now("M107")
+            self.p.send_now("M84")
+            self.sethotendgui(0)
+            self.setbedgui(0)
+            self.log(_("Cleared: print cancelled, heaters, fan and motors off."))
+        self._unload_file()
 
     def do_setspeed(self, l = ""):
         try:
@@ -1085,6 +1292,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         self.settings._add(BooleanSetting("clamp_jogging", False, _("Clamp manual moves"), _("Prevent manual moves from leaving the specified build dimensions"), "Printer"))
         self.settings._add(BooleanSetting("display_progress_on_printer", False, _("Display progress on printer"), _("Show progress on printers display (sent via M117, might not be supported by all printers)"), "Printer"))
         self.settings._add(SpinSetting("printer_progress_update_interval", 10., 0, 120, _("Printer progress update interval"), _("Interval in which pronterface sends the progress to the printer if enabled, in seconds"), "Printer"))
+        self.settings._add(BooleanSetting("heaters_off_on_exit", False, _("Turn heaters off when closing"), _("Switch the nozzle and bed heaters off when Pronterface is closed. Off by default: heaters are left as they are."), "Printer"))
         self.settings._add(BooleanSetting("cutting_as_extrusion", True, _("Display cutting moves"), _("Show moves where spindle is active as printing moves"), "Printer"))
         self.settings._add(ComboSetting("uimode", _("Standard"), [_("Standard"), _("Compact"), ], _("Interface mode"), _("Standard interface is a one-page, three columns layout with controls/visualization/log\nCompact mode is a one-page, two columns layout with controls + log/visualization"), "UI"), self.on_ui_reload)
         # self.settings._add(ComboSetting("uimode", _("Standard"), [_("Standard"), _("Compact"), _("Tabbed"), _("Tabbed with platers")], _("Interface mode"), _("Standard interface is a one-page, three columns layout with controls/visualization/log\nCompact mode is a one-page, two columns layout with controls + log/visualization"), "UI"), self.on_ui_reload)
@@ -1101,6 +1309,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         self.settings._add(FloatSpinSetting("gcview_path_width", 0.4, 0.01, 2, _("Extrusion width for 3D viewer"), _("Width of printed path in 3D viewer"), "Viewer", increment = 0.05), self.update_gcview_params)
         self.settings._add(FloatSpinSetting("gcview_path_height", 0.3, 0.01, 2, _("Layer height for 3D viewer"), _("Height of printed path in 3D viewer"), "Viewer", increment = 0.05), self.update_gcview_params)
         self.settings._add(BooleanSetting("tempgraph", True, _("Display temperature graph"), _("Display time-lapse temperature graph"), "UI"), self.on_ui_reload)
+        self.settings._add(BooleanSetting("statuspanel", True, _("Display big status panel"), _("Show a large, easy-to-read strip with temperatures, print progress and time left"), "UI"), self.on_ui_reload)
         self.settings._add(BooleanSetting("tempgauges", False, _("Display temperature gauges"), _("Display graphical gauges for temperatures visualization"), "UI"), self.on_ui_reload)
         self.settings._add(BooleanSetting("lockbox", False, _("Display interface lock checkbox"), _("Display a checkbox that, when check, locks most of Pronterface"), "UI"), self.on_ui_reload)
         self.settings._add(BooleanSetting("lockonstart", False, _("Lock interface upon print start"), _("If lock checkbox is enabled, lock the interface when starting a print"), "UI"))
@@ -1118,6 +1327,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         self.settings._add(SpinSetting("preview_grid_step1", 10., 0, 200, _("Fine grid spacing"), _("Fine Grid Spacing"), "Viewer"), self.update_gviz_params)
         self.settings._add(SpinSetting("preview_grid_step2", 50., 0, 200, _("Coarse grid spacing"), _("Coarse Grid Spacing"), "Viewer"), self.update_gviz_params)
         self.settings._add(StaticTextSetting("separator_colors1", _("General"), "", group = "Colors"))
+        self.settings._add(ComboSetting("theme", "Light", ("Light", "Dark"), _("Theme"), _("Light or dark color scheme. Switching sets the background, graph and 3D view colors below; you can still fine-tune them afterwards."), "Colors"), self.apply_theme)
         self.settings._add(ColorSetting("bgcolor", self._preferred_bgcolour_hex(), _("Background color"), _("Pronterface background color"), "Colors", isRGBA=False), self.on_ui_reload)
         self.settings._add(StaticTextSetting("separator_colors2", _("Temperature Graph"), "", group = "Colors"))
         self.settings._add(ColorSetting("graph_color_background", "#FAFAC7", _("Graph background color"), _("Color of the temperature graph background"), "Colors", isRGBA=False), self.on_ui_reload)
@@ -1294,6 +1504,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
                         # 13 chars for up to 99h est.
         elif self.loading_gcode:
             status_string = self.loading_gcode_message
+        self.update_statuspanel_progress()
         wx.CallAfter(self.statusbar.SetStatusText, status_string)
         wx.CallAfter(self.gviz.Refresh)
         # Call pronsole's statuschecker inner loop function to handle
@@ -1307,8 +1518,37 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         except queue.Empty:
             pass
 
+    def update_statuspanel_progress(self):
+        panel = getattr(self, "statuspanel", None)
+        if not panel:
+            return
+        try:
+            if self.sdprinting or self.uploading or self.p.printing or self.paused:
+                secondsremain, secondsestimate, progress = self.get_eta()
+                if self.uploading:
+                    state = _("Uploading to SD card")
+                elif self.sdprinting:
+                    state = _("Printing from SD card")
+                    progress = self.percentdone / 100.0
+                elif self.paused:
+                    state = _("Paused")
+                else:
+                    state = _("Printing")
+                if self.p.printing and self.p.mainqueue:
+                    progress = float(self.p.queueindex) / len(self.p.mainqueue)
+                remaining = format_duration(secondsremain) if secondsremain and secondsremain > 0 else None
+                wx.CallAfter(panel.set_progress, state, progress, remaining, self.curlayer)
+            elif self.p.online:
+                state = _("Ready - file loaded") if self.fgcode else _("Ready - no file loaded")
+                wx.CallAfter(panel.set_progress, state)
+            else:
+                wx.CallAfter(panel.set_progress, _("Not connected"))
+        except Exception:
+            logging.debug(traceback.format_exc())
+
     def statuschecker(self):
         pronsole.pronsole.statuschecker(self)
+        self.update_statuspanel_progress()
         wx.CallAfter(self.statusbar.SetStatusText, _("Not connected to printer."))
 
     #  --------------------------------------------------------------
@@ -2015,6 +2255,11 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
                 target = float(temps[name][1]) if temps[name][1] else None
                 if name == 'T':
                     name = 'T0'
+                if getattr(self, "statuspanel", None):
+                    if name == 'T' + str(self.current_tool):
+                        wx.CallAfter(self.statuspanel.set_temps, nozzle = current, nozzle_target = target)
+                    elif name == 'B':
+                        wx.CallAfter(self.statuspanel.set_temps, bed = current, bed_target = target)
                 if self.display_graph:
                     prefix = 'Set' + name.replace('T', 'Extruder').replace('B', 'Bed')
                     wx.CallAfter(getattr(self.graph, prefix + 'Temperature'), current)

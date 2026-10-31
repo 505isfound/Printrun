@@ -749,3 +749,100 @@ class SpecialButton:
         self.background = background
         self.tooltip = tooltip
         self.custom = custom
+
+
+class StatusPanel(wx.Panel):
+    """Big, glanceable status strip: nozzle/bed temps, print progress,
+    time remaining and current height. Readable from across the room."""
+
+    def __init__(self, parent, bgcolor = None):
+        super().__init__(parent)
+        if bgcolor is not None:
+            self.SetBackgroundColour(bgcolor)
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        big = self.GetFont()
+        big.SetPointSize(big.GetPointSize() + 6)
+        big = big.Bold()
+        small = self.GetFont()
+        small.SetPointSize(small.GetPointSize() + 1)
+
+        def block(title):
+            col = wx.BoxSizer(wx.VERTICAL)
+            label = wx.StaticText(self, -1, title)
+            label.SetFont(small)
+            value = wx.StaticText(self, -1, "--")
+            value.SetFont(big)
+            col.Add(label, 0)
+            col.Add(value, 0)
+            sizer.Add(col, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 12)
+            return label, value
+
+        self.nozzle_label, self.nozzle = block(_("Nozzle"))
+        self.bed_label, self.bed = block(_("Bed"))
+
+        progcol = wx.BoxSizer(wx.VERTICAL)
+        self.state = wx.StaticText(self, -1, _("Not connected"))
+        self.state.SetFont(small)
+        self.gauge = wx.Gauge(self, -1, 1000, size = (-1, 18))
+        progcol.Add(self.state, 0)
+        progcol.Add(self.gauge, 0, wx.EXPAND | wx.TOP, 3)
+        sizer.Add(progcol, 1, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 12)
+
+        self.percent_label, self.percent = block(_("Progress"))
+        self.remain_label, self.remain = block(_("Time left"))
+        self.z_label, self.z = block(_("Height"))
+
+        self.labels = [self.nozzle_label, self.bed_label, self.state,
+                       self.percent_label, self.remain_label, self.z_label,
+                       self.nozzle, self.bed, self.percent, self.remain, self.z]
+        self.SetSizer(sizer)
+        # Lay out once the window is fully built, so labels get their
+        # real (large-font) size instead of being clipped on launch
+        wx.CallAfter(self._relayout)
+
+    @staticmethod
+    def _fmt_temp(current, target):
+        if current is None:
+            return "--"
+        if target:
+            return "%d / %d°C" % (round(current), round(target))
+        return "%d°C" % round(current)
+
+    def set_temps(self, nozzle = None, nozzle_target = None,
+                  bed = None, bed_target = None):
+        if nozzle is not None:
+            self.nozzle.SetLabel(self._fmt_temp(nozzle, nozzle_target))
+        if bed is not None:
+            self.bed.SetLabel(self._fmt_temp(bed, bed_target))
+        self._relayout()
+
+    def set_progress(self, state, fraction = None, remaining = None, z = None):
+        self.state.SetLabel(state)
+        if fraction is None:
+            self.gauge.SetValue(0)
+            self.percent.SetLabel("--")
+        else:
+            fraction = max(0.0, min(1.0, fraction))
+            self.gauge.SetValue(int(fraction * 1000))
+            self.percent.SetLabel("%d%%" % int(fraction * 100))
+        self.remain.SetLabel(remaining or "--")
+        self.z.SetLabel(("%.2f mm" % z) if z is not None else "--")
+        self._relayout()
+
+    def _relayout(self):
+        if not self:  # window already destroyed (UI reload)
+            return
+        for label in getattr(self, "labels", []):
+            label.InvalidateBestSize()
+        self.InvalidateBestSize()
+        needed = self.GetSizer().CalcMin()
+        if needed != getattr(self, "_last_min", None):
+            self._last_min = needed
+            self.SetMinSize((-1, needed.height))
+            self.GetParent().Layout()
+        self.Layout()
+
+    def set_text_colour(self, colour):
+        for label in self.labels:
+            label.SetForegroundColour(colour)

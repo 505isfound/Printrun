@@ -167,8 +167,8 @@ class pronsole(cmd.Cmd):
         self.paused = False
         self.sdprinting = 0
         self.uploading = 0  # Unused, just for pronterface generalization
-        self.temps = {"PLA": "185", "ABS": "230", "Off": "0"}
-        self.bedtemps = {"PLA": "60", "ABS": "110", "Off": "0"}
+        self.temps = {"PLA": "200", "PETG": "235", "ABS": "230", "Off": "0"}
+        self.bedtemps = {"PLA": "60", "PETG": "75", "ABS": "110", "Off": "0"}
         self.percentdone = 0
         self.posreport = ""
         self.tempreadings = ""
@@ -1386,12 +1386,14 @@ Disables all heaters upon exit."))
     def set_temp_preset(self, key, value):
         if not key.startswith("bed"):
             self.temps["PLA"] = str(self.settings.temperature_pla)
+            self.temps["PETG"] = str(self.settings.temperature_petg)
             self.temps["ABS"] = str(self.settings.temperature_abs)
-            self.log(_("Hotend temperature presets updated, PLA:%s, ABS:%s") % (self.temps["PLA"], self.temps["ABS"]))
+            self.log(_("Hotend temperature presets updated, PLA:%s, PETG:%s, ABS:%s") % (self.temps["PLA"], self.temps["PETG"], self.temps["ABS"]))
         else:
             self.bedtemps["PLA"] = str(self.settings.bedtemp_pla)
+            self.bedtemps["PETG"] = str(self.settings.bedtemp_petg)
             self.bedtemps["ABS"] = str(self.settings.bedtemp_abs)
-            self.log(_("Bed temperature presets updated, PLA:%s, ABS:%s") % (self.bedtemps["PLA"], self.bedtemps["ABS"]))
+            self.log(_("Bed temperature presets updated, PLA:%s, PETG:%s, ABS:%s") % (self.bedtemps["PLA"], self.bedtemps["PETG"], self.bedtemps["ABS"]))
 
     def tempcb(self, l):
         if "T:" in l:
