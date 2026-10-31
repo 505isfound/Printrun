@@ -92,7 +92,5 @@ jobs:
             dist/README.md
             dist/locale
 
-  upload_release_assets:
-    needs: [build]
-    if: github.event_name == 'release' && github.event.action == 'published'
-    uses: kliment/Printrun/.github/workflows/upload-assets.yml@master
+  # (Release-upload job removed in this fork: it requested write
+  # permissions the fork does not grant, which stopped the whole build.)
