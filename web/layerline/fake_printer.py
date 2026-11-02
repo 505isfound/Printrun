@@ -22,8 +22,9 @@ CHECKSUM = re.compile(r"\*\d+\s*$")
 
 
 class FakePrinter:
-    def __init__(self, port=0, host="127.0.0.1", tools=1):
+    def __init__(self, port=0, host="127.0.0.1", tools=1, move_delay=0.0):
         self.tools = tools
+        self.move_delay = move_delay      # seconds per G0/G1, so prints take real time
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((host, port))
@@ -152,6 +153,8 @@ class FakePrinter:
                 for a in "XYZE":
                     if a in args and isinstance(args[a], float):
                         self.pos[a] = args[a]
+        if cmd in ("G0", "G1") and self.move_delay:
+            time.sleep(self.move_delay)
         if cmd == "M105":
             return "ok " + self.temp_report() + "\n"
         if cmd == "M115":
@@ -182,7 +185,8 @@ class FakePrinter:
 
 if __name__ == "__main__":
     import sys
-    fp = FakePrinter(int(sys.argv[1]) if len(sys.argv) > 1 else 5555)
+    fp = FakePrinter(int(sys.argv[1]) if len(sys.argv) > 1 else 5555,
+                     move_delay=float(sys.argv[2]) if len(sys.argv) > 2 else 0.0)
     print("Simulated printer listening on", fp.address)
     try:
         while True:

@@ -39,6 +39,7 @@
   <div class="strip-tools" id="s-tools" hidden></div>
   <div class="strip-job">
     <span class="strip-state" id="s-state">Not connected</span>
+    <span class="strip-file" id="s-file"></span>
     <span class="bar"><span id="s-bar"></span></span>
   </div>
   <div class="strip-stat"><span class="strip-label">Progress</span><span class="strip-num" id="s-progress">—</span></div>
@@ -48,6 +49,36 @@
 
 <main class="layout">
   <aside class="side">
+    <section class="group lockable" id="print-group" aria-labelledby="print-h">
+      <h2 class="group-title" id="print-h">Print</h2>
+      <div class="callout" id="recover" hidden>
+        <strong>Print interrupted</strong>
+        <p id="recover-text"></p>
+        <p class="callout-help">Reconnect and reheat the nozzle and bed first. Resuming homes X and Y only, keeps the print height, then carries on from where it stopped.</p>
+        <div class="callout-actions">
+          <button class="btn primary" id="recover-btn" type="button">Resume print</button>
+          <button class="link" id="recover-discard" type="button">Dismiss</button>
+        </div>
+      </div>
+      <div class="list">
+        <div class="row file-row">
+          <span class="row-label file-label"><span class="file-name" id="file-name">No file loaded</span><small id="file-info">Choose a G-code file exported from your slicer</small></span>
+          <button class="link" id="file-clear" type="button" hidden>Remove</button>
+        </div>
+        <div class="row file-actions">
+          <button class="pill plain" id="choose-file" type="button">Choose file…</button>
+          <select id="recent" aria-label="Recent files"></select>
+          <input type="file" id="file-input" accept=".gcode,.gco,.g,.nc,.txt" hidden>
+        </div>
+      </div>
+      <div class="actions print-actions">
+        <button class="btn primary" id="print-btn" type="button" disabled>Print</button>
+        <button class="btn" id="pause-btn" type="button" hidden>Pause</button>
+        <button class="btn" id="restart-btn" type="button" hidden>Restart</button>
+        <button class="btn danger-text" id="cancel-btn" type="button" hidden>Cancel print</button>
+      </div>
+    </section>
+
     <section class="group lockable" aria-labelledby="temps-h">
       <h2 class="group-title" id="temps-h">Temperatures</h2>
       <div class="list">
@@ -168,7 +199,7 @@
     <h2 id="confirm-title"></h2>
     <p id="confirm-body"></p>
     <div class="sheet-actions">
-      <button class="btn" id="confirm-cancel" type="button">Cancel</button>
+      <button class="btn" id="confirm-cancel" type="button">Not now</button>
       <button class="btn danger" id="confirm-ok" type="button">OK</button>
     </div>
   </div>

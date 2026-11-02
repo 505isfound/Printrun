@@ -307,3 +307,22 @@ body.graph-window { padding: 20px 24px 18px; gap: 14px; }
 .graph-body { flex: 1; min-height: 300px; background: var(--card); border-radius: 16px; position: relative; }
 .graph-body canvas { position: absolute; left: 18px; right: 18px; top: 18px; bottom: 12px;
   width: calc(100% - 36px); height: calc(100% - 30px); display: block; }
+
+/* ===================== Phase 2: printing ===================== */
+.file-label { min-width: 0; flex: 1; }
+.file-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-label small { max-width: none; }
+.file-actions { gap: 10px; justify-content: flex-start; }
+.file-actions select { flex: 1; max-width: none; }
+.print-actions .btn { flex: 1; white-space: nowrap; padding-inline: 10px; }
+.btn.danger-text { color: var(--danger); }
+.strip-file { font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: -4px; }
+.strip-file:empty { display: none; }
+.callout {
+  background: color-mix(in srgb, var(--warn) 14%, var(--card)); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 12px;
+}
+.callout strong { font-size: 15px; }
+.callout p { margin: 4px 0 0; font-size: 14px; }
+.callout .callout-help { color: var(--ink-2); font-size: 13px; }
+.callout-actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; }

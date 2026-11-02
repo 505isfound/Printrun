@@ -45,6 +45,9 @@ Running notes so any new Claude chat can pick up where we left off.
 - Phase 1 built (2026-11-02): temps & safety, new graph, status strip, settings sheet, lock, multi-extruder.
   Keegan tested on the Ender 5 Pro 2026-11-01: all good (incl. graph in its own window). 'Turn everything off'
   button removed at his request. Multi-extruder only verified on the simulator.
+- Phase 2 built (2026-11-02): printing. Pause/Resume + Cancel print (replaces Stop print, Keegan's call).
+  Fixed two classic gaps: sleep not released on cancel; pulled cable mid-print never detected (watchdog).
+  26 pytest + 13/19/21 browser checks passing. Waiting on Keegan's real print.
 - Repo rename to `505isfound/Layerline` is up to Keegan (GitHub settings writes are blocked from Claude's session);
   after renaming, re-attach the repo under the new name.
 

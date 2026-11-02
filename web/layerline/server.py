@@ -9,6 +9,8 @@ the engine, and websocket requests from other sites are refused.
 import asyncio
 import json
 import logging
+import os
+import re
 import secrets
 import socket
 import threading
@@ -37,6 +39,7 @@ class Server:
         self._ready = threading.Event()
         self.on_quit = None
         self.on_open_window = None   # set by the app when it has real app windows
+        self.on_pick_file = None     # app window: returns a path from Windows' own file dialog
 
     # -- called from any thread ------------------------------------------
     def emit(self, event):
@@ -109,6 +112,20 @@ class Server:
     async def graph_page(self, request):
         return web.FileResponse(STATIC / "graph.html", headers={"Cache-Control": "no-store"})
 
+    async def upload(self, request):
+        """Browser mode: the page sends the chosen G-code file here; it's saved
+        in Layerline's own folder and loaded like any other file."""
+        name = os.path.basename(request.query.get("name", "upload.gcode")) or "upload.gcode"
+        name = re.sub(r"[^\w.\- ()]", "_", name)[:120]
+        folder = self.engine.cache_dir / "uploads"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / name
+        with open(path, "wb") as f:
+            async for chunk in request.content.iter_chunked(1 << 16):
+                f.write(chunk)
+        self.engine.load_file(str(path))
+        return web.json_response({"ok": True})
+
     def page_url(self, path):
         """URL for another app window (carries the access key, like the main window)."""
         return "http://%s:%d%s?key=%s" % (self.host, self.port, path, self.key)
@@ -123,6 +140,7 @@ class Server:
             "log": self.backlog[-LOG_BACKLOG:],
             "buttons": e.custombuttons,
             "temp_history": list(e.temp_history),
+            "native_dialogs": self.on_pick_file is not None,
             "settings_info": e.settings_info(),
         })
 
@@ -179,6 +197,34 @@ class Server:
             else:   # running in a browser: let the page open a browser window
                 await ws.send_str(json.dumps({"type": "open_url", "url": "/graph", "name": "layerline-graph"}))
             return
+        elif action == "pick_file":
+            if self.on_pick_file:
+                start_dir = e.settings.last_file_path or ""
+                path = await asyncio.get_running_loop().run_in_executor(None, self.on_pick_file, start_dir)
+                if path:
+                    e.load_file(path)
+            return
+        elif action == "load_recent":
+            path = str(msg.get("path"))
+            if path in e.recent_files():
+                if os.path.exists(path):
+                    e.load_file(path)
+                else:
+                    e.logError("That file isn't there anymore: %s" % path)
+        elif action == "print":
+            e.print_file()
+        elif action == "pause":
+            e.pause_print()
+        elif action == "resume":
+            e.resume_print()
+        elif action == "cancel":
+            e.cancel_print()
+        elif action == "clear_file":
+            e.clear_file()
+        elif action == "recover":
+            e.recover_print()
+        elif action == "discard_recovery":
+            e.discard_recovery()
         elif action == "tool":
             e.set_tool(msg.get("tool", 0))
         elif action == "lock":
@@ -193,10 +239,11 @@ class Server:
 
     # -- startup ----------------------------------------------------------
     def _make_app(self):
-        app = web.Application(middlewares=[self._guard])
+        app = web.Application(middlewares=[self._guard], client_max_size=1024 ** 3)
         app.router.add_get("/", self.index)
         app.router.add_get("/graph", self.graph_page)
         app.router.add_get("/api/initial", self.initial)
+        app.router.add_post("/api/upload", self.upload)
         app.router.add_get("/ws", self.websocket)
         app.router.add_static("/static/", STATIC)
         return app

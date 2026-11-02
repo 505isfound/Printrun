@@ -168,7 +168,17 @@ def main(argv=None):
                     pass
             extra_windows.clear()
 
+        def pick_file(start_dir):
+            """Windows' own Open dialog, starting in the last folder used."""
+            result = window.create_file_dialog(
+                webview.OPEN_DIALOG, directory=start_dir or "",
+                file_types=("G-code files (*.gcode;*.gco;*.g;*.nc)", "All files (*.*)"))
+            if result:
+                return result[0] if isinstance(result, (list, tuple)) else result
+            return None
+
         server.on_open_window = open_window
+        server.on_pick_file = pick_file
         window.events.closed += close_extra_windows
 
         def on_closing():

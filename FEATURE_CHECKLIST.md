@@ -94,19 +94,22 @@ Printer ──USB── PC ┬─ Engine: Pronterface's own host code (pronsole 
 
 | | Feature | Status | How we test |
 |---|---|---|---|
-| [ ] | Load G-code file (+ last folder & file-type filter remembered) | Rebuilt | |
-| [ ] | Recent files | Rebuilt | |
-| [ ] | Print / Restart | Reused + Rebuilt | Short test print |
-| [ ] | Pause / Resume (with pause script) | Reused + Rebuilt | |
-| [ ] | Stop print (pause only, nothing else touched) | Rebuilt (added this week) | Temps stay put |
-| [ ] | Clear file | Rebuilt (added this week) | |
-| [ ] | Progress %, line count, time remaining, current height | Reused + Rebuilt | Matches classic |
-| [ ] | File info: size, filament used, estimated duration | Reused + Rebuilt | |
-| [ ] | Show progress on printer's screen (M117) + update interval | Reused | |
-| [ ] | End-of-print script | Reused | |
-| [ ] | Run program on print start / finish / error (Start/Final/Error command) | Reused | |
-| [ ] | Recover after disconnect (re-home XY, restore Z/E, continue) | Reused + Rebuilt | Simulated disconnect |
-| [ ] | Filament-used total (for spool tracking) | Reused | |
+| [~] | Load G-code file (+ last folder remembered) | Rebuilt | Windows' own Open dialog; browser mode uploads. File-type filter always starts on G-code |
+| [~] | Recent files | Rebuilt | |
+| [~] | Print / Restart | Reused + Rebuilt | Short test print |
+| [~] | Pause / Resume (with pause script) | Reused + Rebuilt | |
+| [~] | Cancel print (replaces "Stop print", decided 2026-11-01): stops the print, heaters on, file stays loaded | Rebuilt | Temps stay put |
+| [~] | Clear file | Rebuilt (added this week) | |
+| [~] | Progress %, line count, time remaining, current height | Reused + Rebuilt | Matches classic |
+| [~] | File info: size, filament used, estimated duration | Reused + Rebuilt | |
+| [~] | Show progress on printer's screen (M117) + update interval | Reused | |
+| [~] | End-of-print script | Reused | |
+| [~] | Run program on print start / finish / error (Start/Final/Error command) | Reused | |
+| [~] | Recover after disconnect (re-home XY, restore Z/E, continue) | Reused + Rebuilt, now also after a pulled cable | Simulated disconnect + cable pull |
+| [~] | Filament-used total (for spool tracking) | Reused | |
+
+| [~] | Fix: PC allowed to sleep again after Cancel / Clear all (classic only did this when a print finished) | New | |
+| [~] | Fix: notice a lost connection mid-print (classic kept showing "Printing" forever) | New | Simulated cable pull |
 
 ## Phase 3: Movement & extrusion
 

@@ -34,6 +34,8 @@ const SETTINGS_LAYOUT = [
     ["extruders", "Number of nozzles", ""],
     ["heaters_off_on_exit", "Turn heaters off when closing", "Off by default: closing leaves heaters as they are"],
     ["dtr", "Reset board when connecting", "Turn off if your printer restarts every time you connect"],
+    ["display_progress_on_printer", "Show progress on the printer's screen", "Not every printer supports this"],
+    ["printer_progress_update_interval", "Update the printer's screen every", "", "s"],
   ]},
   { title: "Preheat temperatures", items: [
     ["temperature_pla", "PLA nozzle", ""], ["bedtemp_pla", "PLA bed", ""],
@@ -74,6 +76,7 @@ async function start() {
   ui.history = data.history || [];
   ui.temps = data.temp_history || [];
   ui.settingsInfo = data.settings_info || {};
+  ui.nativeDialogs = !!data.native_dialogs;
   ui.baud = data.state.settings.baudrate || 115200;
   renderPorts(data.state.settings.port);
   renderBauds();
@@ -84,8 +87,9 @@ async function start() {
 }
 
 // ---------- confirm sheet ----------
-function ask(title, body, okLabel, danger = true) {
+function ask(title, body, okLabel, danger = true, cancelLabel = "Not now") {
   return new Promise((resolve) => {
+    $("confirm-cancel").textContent = cancelLabel;
     $("confirm-title").textContent = title;
     $("confirm-body").textContent = body;
     const ok = $("confirm-ok");
@@ -317,8 +321,7 @@ function renderState(s) {
       input.value = online ? String(Math.round(tgt)) : "";
     }
   }
-  $("s-state").textContent = !online ? (s.connecting ? "Connecting…" : "Not connected")
-    : s.paused ? "Paused" : (s.printing || s.sdprinting) ? "Printing" : s.filename ? "Ready to print" : "Idle";
+  renderJob(s);
 
   // controls that need a printer
   document.querySelectorAll("form.heater button, .preset, .tile, #tools button").forEach((el) => { el.disabled = !online; });
@@ -330,6 +333,112 @@ function renderState(s) {
   updateLegends(s);
   if (!$("settings-sheet").hidden) syncSettings(s);
 }
+
+// ---------- printing ----------
+function duration(sec) {
+  if (sec == null) return "—";
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return sec < 5 ? "Almost done" : "Under 1 min";
+  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  if (!h) return `${m} min`;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+function filamentText(mm) {
+  if (!mm) return "";
+  return mm >= 1000 ? `${(mm / 1000).toFixed(2)} m of filament` : `${Math.round(mm)} mm of filament`;
+}
+
+function renderJob(s) {
+  const job = s.job || {};
+  const online = !!s.online;
+  const active = !!job.active;
+  const paused = !!s.paused;
+  const running = active && !paused;
+
+  // file row
+  $("file-name").textContent = job.loading ? "Loading file…" : job.loaded ? job.name : "No file loaded";
+  $("file-name").title = job.path || "";
+  $("file-info").textContent = job.loading ? "Reading the G-code" : job.loaded
+    ? [job.duration ? `About ${duration(job.duration)}` : "", filamentText(job.filament),
+       job.layers ? `${job.layers} layers` : "", job.height ? `${job.height} mm tall` : ""].filter(Boolean).join(", ")
+    : "Choose a G-code file exported from your slicer";
+  $("file-clear").hidden = !job.loaded || active;
+  $("choose-file").disabled = active || job.loading;
+
+  // recent files
+  const sel = $("recent");
+  const sig = JSON.stringify(s.recent || []);
+  if (sel.dataset.sig !== sig) {
+    sel.dataset.sig = sig;
+    sel.innerHTML = "";
+    sel.add(new Option((s.recent || []).length ? "Recent files" : "No recent files", ""));
+    (s.recent || []).forEach((f) => { const o = new Option(f.name, f.path); o.title = f.path; sel.add(o); });
+  }
+  sel.disabled = active || job.loading || !(s.recent || []).length;
+
+  // buttons
+  const printBtn = $("print-btn");
+  printBtn.textContent = paused ? "Resume" : "Print";
+  printBtn.hidden = running;
+  printBtn.disabled = !online || job.loading || !(job.loaded || paused);
+  $("pause-btn").hidden = !running;
+  $("pause-btn").disabled = !online;
+  $("restart-btn").hidden = !paused || s.sdprinting;
+  $("cancel-btn").hidden = !active;
+
+  // interrupted print
+  const rec = job.recovery;
+  $("recover").hidden = !rec;
+  if (rec) {
+    $("recover-text").textContent = `${rec.filename || "The print"} stopped at ${Math.round(rec.percent)}%, at a height of ${rec.z.toFixed(2)} mm.`;
+    $("recover-btn").disabled = !online || active;
+  }
+
+  // status strip
+  $("s-state").textContent = !online ? (s.connecting ? "Connecting…" : "Not connected")
+    : job.loading ? "Loading file…" : paused ? "Paused" : active ? "Printing"
+    : job.loaded ? "Ready to print" : "Idle";
+  const lineText = active && job.line != null && job.total_lines ? `, line ${job.line.toLocaleString("en-US")} of ${job.total_lines.toLocaleString("en-US")}` : "";
+  $("s-file").textContent = (active || job.loaded) && online ? (job.name || "") + lineText : "";
+  const pct = active && job.progress != null ? job.progress : null;
+  $("s-progress").textContent = pct == null ? "—" : `${Math.floor(pct * 100)}%`;
+  $("s-bar").style.width = `${pct == null ? 0 : Math.min(100, pct * 100)}%`;
+  $("s-left").textContent = active ? (paused ? "Paused" : duration(job.remaining)) : "—";
+  $("s-height").textContent = active && job.z ? `${job.z.toFixed(2)} mm` : "—";
+}
+
+$("choose-file").onclick = () => {
+  if (ui.nativeDialogs) send({ action: "pick_file" });
+  else $("file-input").click();
+};
+$("file-input").onchange = async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  addLog({ level: "info", text: `Uploading ${file.name}…` });
+  const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
+  if (!res.ok) addLog({ level: "error", text: `Couldn't open ${file.name}.` });
+};
+$("recent").onchange = (e) => {
+  if (e.target.value) send({ action: "load_recent", path: e.target.value });
+  e.target.value = "";
+};
+$("file-clear").onclick = () => send({ action: "clear_file" });
+$("print-btn").onclick = () => send({ action: ui.state?.paused ? "resume" : "print" });
+$("pause-btn").onclick = () => send({ action: "pause" });
+$("restart-btn").onclick = async () => {
+  if (await ask("Start the print over?", "The print starts again from the beginning. Clear the bed first.", "Start over", false)) {
+    send({ action: "print" });
+  }
+};
+$("cancel-btn").onclick = async () => {
+  if (await ask("Cancel the print?", "The print stops here and can't be resumed. Heaters stay on and the file stays loaded, so you can start it again.", "Cancel print", true, "Keep printing")) {
+    send({ action: "cancel" });
+  }
+};
+$("recover-btn").onclick = () => send({ action: "recover" });
+$("recover-discard").onclick = () => send({ action: "discard_recovery" });
 
 // ---------- graph ----------
 function addSample(sample) {
@@ -373,7 +482,7 @@ function buildSettings() {
     h.textContent = group.title;
     const list = document.createElement("div");
     list.className = "list";
-    for (const [name, label, help] of group.items) {
+    for (const [name, label, help, unit = "°"] of group.items) {
       const info = ui.settingsInfo[name];
       if (!info) continue;
       const row = document.createElement("label");
@@ -404,7 +513,8 @@ function buildSettings() {
       } else {
         control = document.createElement("span");
         control.className = "num-wrap";
-        control.innerHTML = `<input class="num" type="number" min="0" max="400" step="1"><span class="unit">°</span>`;
+        control.innerHTML = `<input class="num" type="number" min="0" max="400" step="1"><span class="unit"></span>`;
+        control.querySelector(".unit").textContent = unit;
         const input = control.querySelector("input");
         input.setAttribute("aria-label", label);
         input.onchange = () => { if (input.value !== "") send({ action: "setting", name, value: String(Math.round(Number(input.value))) }); };
