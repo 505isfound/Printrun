@@ -119,11 +119,11 @@ def test_only_listed_settings_editable(rig):
     assert engine.settings.port == before
 
 
-def test_everything_off_is_last(rig):
-    """Classic "Off": motors, heaters, fan, power supply."""
+def test_classic_off_command_still_works(rig):
+    """The button was removed, but classic's `off` command stays in the console."""
     printer, engine, server = rig
     n = len(printer.received)
-    engine.everything_off()
+    engine.submit("off")
     assert wait(lambda: {"M84", "M104 S0", "M140 S0", "M107", "M81"} <= set(sent_since(printer, n)))
 
 

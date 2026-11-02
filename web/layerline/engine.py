@@ -235,15 +235,6 @@ class WebHost(pronsole.pronsole):
             self.log("Motors off.")
         self.run(go)
 
-    def everything_off(self):
-        """Classic "Off": pause, motors, heaters, fan, power supply (M81)."""
-        def go():
-            if self._extruder_count() > 1 and self.p.online:
-                for tool in range(1, self._extruder_count()):
-                    self.p.send_now("M104 T%d S0" % tool)
-            self.off()
-        self.run(go)
-
     def clear_all(self):
         """Cancel the print, heaters + fan + motors off, unload the file."""
         def go():

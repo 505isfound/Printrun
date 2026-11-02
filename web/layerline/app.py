@@ -77,6 +77,8 @@ def selftest(result_file, rest):
         check("web server answers", "state" in data)
         page = urllib.request.urlopen(url, timeout=10).read().decode()
         check("interface page served", "Layerline" in page)
+        graph = urllib.request.urlopen(url.replace("/?", "/graph?"), timeout=10).read().decode()
+        check("graph window page served", "Temperature graph" in graph)
         engine.connect(fp.address, 115200)
         t = time.time()
         while not engine.p.online and time.time() - t < 15:
@@ -139,6 +141,35 @@ def main(argv=None):
     if webview is not None:
         window = webview.create_window("Layerline", url, width=1280, height=820,
                                        min_size=(900, 600), background_color="#F2F2F7")
+        extra_windows = {}
+
+        def open_window(name):
+            """Open (or bring back) a separate app window, e.g. the temperature graph."""
+            existing = extra_windows.get(name)
+            if existing is not None:
+                try:
+                    existing.restore()
+                    existing.show()
+                    return
+                except Exception:
+                    extra_windows.pop(name, None)
+            if name == "graph":
+                w = webview.create_window("Temperature graph", server.page_url("/graph"),
+                                          width=1040, height=680, min_size=(520, 380),
+                                          background_color="#F2F2F7")
+                w.events.closed += lambda: extra_windows.pop(name, None)
+                extra_windows[name] = w
+
+        def close_extra_windows():
+            for w in list(extra_windows.values()):
+                try:
+                    w.destroy()
+                except Exception:
+                    pass
+            extra_windows.clear()
+
+        server.on_open_window = open_window
+        window.events.closed += close_extra_windows
 
         def on_closing():
             # Don't close mid-print without asking (the page asks; this cancels the close)

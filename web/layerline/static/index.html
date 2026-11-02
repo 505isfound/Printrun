@@ -83,19 +83,18 @@
       <div class="safety">
         <button class="tile" id="heaters-off" type="button"><strong>Heaters off</strong><small>Nozzle and bed</small></button>
         <button class="tile" id="motors-off" type="button"><strong>Motors off</strong><small>Axes move freely by hand</small></button>
-        <button class="tile" id="everything-off" type="button"><strong>Turn everything off</strong><small>Motors, heaters, fan and printer power</small></button>
         <button class="tile danger" id="clear-all" type="button"><strong>Clear all</strong><small>Cancel print, all off, unload file</small></button>
       </div>
     </section>
     <section class="group" id="graph-group" aria-labelledby="graph-h">
       <h2 class="group-title" id="graph-h">Last minute</h2>
-      <button class="graph-card" id="graph-open" type="button" aria-label="Open the large temperature graph">
+      <button class="graph-card" id="graph-open" type="button" aria-label="Open the temperature graph in its own window">
         <span class="graph-legend">
           <span class="dot-label" data-kind="nozzle">Nozzle</span><span class="legend-val" id="l-nozzle">—</span>
           <span class="dot-label" data-kind="bed">Bed</span><span class="legend-val" id="l-bed">—</span>
         </span>
         <canvas id="graph-small" height="170"></canvas>
-        <span class="graph-hint">Click to expand</span>
+        <span class="graph-hint">Click to open in its own window</span>
       </button>
     </section>
 
@@ -150,28 +149,6 @@
     </form>
   </section>
 </main>
-
-<!-- Large graph -->
-<div class="sheet-backdrop" id="graph-sheet" hidden>
-  <div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-labelledby="graph-title">
-    <div class="sheet-head">
-      <h2 id="graph-title" class="visually-hidden">Temperature graph</h2>
-      <div class="readouts">
-        <div class="readout" data-kind="nozzle"><span class="dot-label" data-kind="nozzle">Nozzle</span><span class="readout-big" id="r-nozzle">—</span><span class="readout-sub" id="r-nozzle-sub"></span></div>
-        <div class="readout" data-kind="bed"><span class="dot-label" data-kind="bed">Bed</span><span class="readout-big" id="r-bed">—</span><span class="readout-sub" id="r-bed-sub"></span></div>
-      </div>
-      <div class="sheet-tools">
-        <div class="segmented" id="range" role="radiogroup" aria-label="Time range">
-          <button type="button" role="radio" data-sec="60" aria-checked="false">1 min</button>
-          <button type="button" role="radio" data-sec="300" aria-checked="true">5 min</button>
-          <button type="button" role="radio" data-sec="900" aria-checked="false">15 min</button>
-        </div>
-        <button class="link" id="graph-close" type="button">Done</button>
-      </div>
-    </div>
-    <canvas id="graph-big" height="460"></canvas>
-  </div>
-</div>
 
 <!-- Settings -->
 <div class="sheet-backdrop" id="settings-sheet" hidden>

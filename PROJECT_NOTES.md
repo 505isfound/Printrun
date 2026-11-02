@@ -56,7 +56,8 @@ Running notes so any new Claude chat can pick up where we left off.
   websocket origin check, `/api/initial`, `/ws` actions: command/connect/disconnect/reset/rescan/debug/set/clearlog/quit.
 - `web/layerline/static/` – index.html, app.css (iOS look; tokens at top), app.js (vanilla JS, no build step).
 - `web/layerline/fake_printer.py` – simulated Marlin/Ender 5 Pro over TCP (`127.0.0.1:port`).
-- `web/layerline/static/graph.js` – canvas temperature graph (small + expanded).
+- `web/layerline/static/graph.js` – canvas temperature graph. Large view = `graph.html`, opened as its own
+  app window (pywebview `open_window` in app.py; browser mode uses window.open).
 - `web/tests/` – pytest; `web/tests/browser/phase*.js` – Playwright click-throughs (node phaseN.js <scratch dir>; need fake printer + app ports free); `.github/workflows/build-web-win.yml` – tests, builds Layerline.exe, runs --selftest.
 - Local testing here: python3.12 + apt `python3-wxgtk4.0` + pip `aiohttp "pyglet<2"`; browser E2E via Playwright.
 - Security note for Phase 7: the `shell` command runs Python — must be blocked for network (non-local) users.

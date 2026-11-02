@@ -16,7 +16,6 @@ const ui = {
   draft: "",
   ws: null,
   temps: [],            // temperature samples for the graph
-  range: 300,           // large graph range (seconds)
   settingsInfo: {},
   editing: new Set(),   // target inputs the user is typing in (don't overwrite)
 };
@@ -63,6 +62,7 @@ function openSocket() {
     else if (msg.type === "temps") addSample(msg.sample);
     else if (msg.type === "ports") { ui.ports = msg.ports; renderPorts(); }
     else if (msg.type === "confirm_close") confirmClose();
+    else if (msg.type === "open_url") window.open(msg.url, msg.name, "width=1040,height=680");
   };
 }
 
@@ -262,13 +262,6 @@ $("motors-off").onclick = async () => {
   if (printing() && !(await ask("A print is running", "Turning the motors off now will ruin the print.", "Turn motors off"))) return;
   send({ action: "motors_off" });
 };
-$("everything-off").onclick = async () => {
-  const body = printing()
-    ? "This pauses the print and turns off the motors, heaters and fan. It also cuts the printer's power if your board supports that."
-    : "Turns off the motors, heaters and fan. It also cuts the printer's power if your board supports that.";
-  if (!(await ask("Turn everything off?", body, "Turn everything off"))) return;
-  send({ action: "everything_off" });
-};
 $("clear-all").onclick = async () => {
   if (printing() && !(await ask("Cancel the print?", "Clear all cancels the print, turns off heaters, fan and motors, and unloads the file.", "Clear all"))) return;
   send({ action: "clear_all" });
@@ -351,9 +344,6 @@ function updateLegends(s) {
   for (const kind of ["nozzle", "bed"]) {
     const cur = s.temps[kind], tgt = s.temps[kind + "_target"];
     $(`l-${kind}`).textContent = online ? `${Math.round(cur)}°${tgt ? ` / ${Math.round(tgt)}°` : ""}` : "—";
-    const t = tempText(cur, tgt, online);
-    $(`r-${kind}`).textContent = t.now;
-    $(`r-${kind}-sub`).textContent = t.sub;
   }
 }
 
@@ -364,21 +354,12 @@ function drawGraphs() {
   requestAnimationFrame(() => {
     drawQueued = false;
     if (!$("graph-group").hidden) TempGraph.draw($("graph-small"), ui.temps, { seconds: 60 });
-    if (!$("graph-sheet").hidden) TempGraph.draw($("graph-big"), ui.temps, { seconds: ui.range, big: true });
   });
 }
 window.addEventListener("resize", drawGraphs);
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawGraphs);
 
-$("graph-open").onclick = () => { $("graph-sheet").hidden = false; drawGraphs(); $("graph-close").focus(); };
-$("graph-close").onclick = () => { $("graph-sheet").hidden = true; };
-$("range").querySelectorAll("button").forEach((b) => {
-  b.onclick = () => {
-    ui.range = Number(b.dataset.sec);
-    $("range").querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
-    drawGraphs();
-  };
-});
+$("graph-open").onclick = () => send({ action: "open_graph" });
 
 // ---------- settings sheet ----------
 function buildSettings() {
@@ -460,12 +441,10 @@ $("settings-close").onclick = () => { $("settings-sheet").hidden = true; };
 // Close sheets with Escape / click outside
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  ["graph-sheet", "settings-sheet"].forEach((id) => { $(id).hidden = true; });
+  $("settings-sheet").hidden = true;
   if (!$("confirm-sheet").hidden) $("confirm-cancel").click();
 });
-["graph-sheet", "settings-sheet"].forEach((id) => {
-  $(id).addEventListener("click", (e) => { if (e.target.id === id) $(id).hidden = true; });
-});
+$("settings-sheet").addEventListener("click", (e) => { if (e.target.id === "settings-sheet") e.currentTarget.hidden = true; });
 
 // ---------- console ----------
 function addLog(entry) {

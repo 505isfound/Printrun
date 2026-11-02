@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temperature graph · Layerline</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="graph-window">
+<header class="graph-top">
+  <div class="readouts">
+    <div class="readout" data-kind="nozzle"><span class="dot-label" data-kind="nozzle">Nozzle</span><span class="readout-big" id="r-nozzle">—</span><span class="readout-sub" id="r-nozzle-sub">Not connected</span></div>
+    <div class="readout" data-kind="bed"><span class="dot-label" data-kind="bed">Bed</span><span class="readout-big" id="r-bed">—</span><span class="readout-sub" id="r-bed-sub">Not connected</span></div>
+  </div>
+  <div class="segmented" id="range" role="radiogroup" aria-label="Time range">
+    <button type="button" role="radio" data-sec="60" aria-checked="false">1 min</button>
+    <button type="button" role="radio" data-sec="300" aria-checked="true">5 min</button>
+    <button type="button" role="radio" data-sec="900" aria-checked="false">15 min</button>
+  </div>
+</header>
+<main class="graph-body">
+  <canvas id="graph-big" aria-label="Temperature graph"></canvas>
+</main>
+<div class="banner" id="banner" hidden>Lost contact with the app. Reconnecting…</div>
+<script src="/static/graph.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const HISTORY_SECONDS = 15 * 60;
+const g = { temps: [], range: 300, state: null };
+if (location.search.includes("key=")) history.replaceState(null, "", "/graph");
+
+function tempText(now, target, online) {
+  if (!online) return { now: "—", sub: "Not connected" };
+  const n = Math.round(now), t = Math.round(target);
+  if (!t) return { now: `${n}°`, sub: n > 45 ? "Off, cooling down" : "Off" };
+  if (n < t - 3) return { now: `${n}°`, sub: `Heating to ${t}°` };
+  if (n > t + 3) return { now: `${n}°`, sub: `Cooling to ${t}°` };
+  return { now: `${n}°`, sub: `Holding ${t}°` };
+}
+
+function renderState(s) {
+  g.state = s;
+  for (const kind of ["nozzle", "bed"]) {
+    const t = tempText(s.temps[kind], s.temps[kind + "_target"], s.online);
+    $(`r-${kind}`).textContent = t.now;
+    $(`r-${kind}-sub`).textContent = t.sub;
+  }
+}
+
+let queued = false;
+function draw() {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => { queued = false; TempGraph.draw($("graph-big"), g.temps, { seconds: g.range, big: true }); });
+}
+
+function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { $("banner").hidden = true; };
+  ws.onclose = () => { $("banner").hidden = false; setTimeout(connect, 1500); };
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === "state") renderState(msg.state);
+    else if (msg.type === "temps") {
+      g.temps.push(msg.sample);
+      const cutoff = msg.sample.t - HISTORY_SECONDS;
+      while (g.temps.length && g.temps[0].t < cutoff) g.temps.shift();
+      draw();
+    }
+  };
+}
+
+document.querySelectorAll("#range button").forEach((b) => {
+  b.onclick = () => {
+    g.range = Number(b.dataset.sec);
+    document.querySelectorAll("#range button").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+    draw();
+  };
+});
+window.addEventListener("resize", draw);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+
+fetch("/api/initial").then((r) => r.json()).then((data) => {
+  g.temps = data.temp_history || [];
+  renderState(data.state);
+  draw();
+  connect();
+});
+</script>
+</body>
+</html>

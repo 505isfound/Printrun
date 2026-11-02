@@ -79,12 +79,12 @@ Printer ──USB── PC ┬─ Engine: Pronterface's own host code (pronsole 
 | [~] | Bed temp: set / off / presets | Rebuilt | |
 | [~] | Preheat buttons: PLA / PETG / ABS (editable temps) | Rebuilt (added this week) | |
 | [~] | Temperature monitoring (Monitor printer status setting) | Reused | Temps update every few sec |
-| [~] | New temperature graph: small + expanded views, 1/5/15 min | Rebuilt (approved mockup) | |
+| [~] | New temperature graph: small view + large view in its own window, 1/5/15 min | Rebuilt (approved mockup) | |
 | [~] | Fan speed shown in expanded graph | Rebuilt | |
 | [~] | Temperature gauges (optional) | Rebuilt | |
 | [~] | Big status strip: temps, progress, time left, height | Rebuilt (added this week) | Temps done; progress/time/height fill in with Phase 2 |
 | [~] | Heaters off / Motors off / Clear all buttons | Rebuilt (added this week) | |
-| [~] | "Off" button: everything off incl. power supply (M81) | Reused + Rebuilt | |
+| [~] | "Off": everything off incl. power supply (M81) | Reused, console `off` only | Button removed at Keegan's request (2026-11-01): the Ender 5 Pro can't power itself off, and Clear all covers the rest |
 | [~] | Closing the app never turns heaters off (opt-in setting) | Rebuilt (added this week) | |
 | [~] | Warning before closing mid-print | Rebuilt | |
 | [~] | Interface lock (+ lock on print start) | Rebuilt | |

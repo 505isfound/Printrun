@@ -36,6 +36,7 @@ class Server:
         self._state_pending = False
         self._ready = threading.Event()
         self.on_quit = None
+        self.on_open_window = None   # set by the app when it has real app windows
 
     # -- called from any thread ------------------------------------------
     def emit(self, event):
@@ -105,6 +106,13 @@ class Server:
     async def index(self, request):
         return web.FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-store"})
 
+    async def graph_page(self, request):
+        return web.FileResponse(STATIC / "graph.html", headers={"Cache-Control": "no-store"})
+
+    def page_url(self, path):
+        """URL for another app window (carries the access key, like the main window)."""
+        return "http://%s:%d%s?key=%s" % (self.host, self.port, path, self.key)
+
     async def initial(self, request):
         e = self.engine
         return web.json_response({
@@ -163,10 +171,14 @@ class Server:
             e.heaters_off()
         elif action == "motors_off":
             e.motors_off()
-        elif action == "everything_off":
-            e.everything_off()
         elif action == "clear_all":
             e.clear_all()
+        elif action == "open_graph":
+            if self.on_open_window:
+                self.on_open_window("graph")
+            else:   # running in a browser: let the page open a browser window
+                await ws.send_str(json.dumps({"type": "open_url", "url": "/graph", "name": "layerline-graph"}))
+            return
         elif action == "tool":
             e.set_tool(msg.get("tool", 0))
         elif action == "lock":
@@ -183,6 +195,7 @@ class Server:
     def _make_app(self):
         app = web.Application(middlewares=[self._guard])
         app.router.add_get("/", self.index)
+        app.router.add_get("/graph", self.graph_page)
         app.router.add_get("/api/initial", self.initial)
         app.router.add_get("/ws", self.websocket)
         app.router.add_static("/static/", STATIC)

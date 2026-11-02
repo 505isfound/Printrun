@@ -64,15 +64,20 @@ const logHas = (page, text) => page.waitForFunction((t) => document.querySelecto
     check('small graph draws lines', inked > 2000);
     await page.screenshot({ path: S + '/shots/p1-1-heating.png' });
 
-    // expanded graph
-    await page.click('#graph-open');
-    await page.waitForSelector('#graph-sheet:not([hidden])');
-    await page.click('#range button[data-sec="60"]');
-    await page.waitForTimeout(400);
-    await page.screenshot({ path: S + '/shots/p1-2-graph.png' });
-    await page.keyboard.press('Escape');
-    check('expanded graph opens and closes', await page.isHidden('#graph-sheet'));
-
+    // graph opens in its own window
+    const [popup] = await Promise.all([page.waitForEvent('popup'), page.click('#graph-open')]);
+    await popup.setViewportSize({ width: 1040, height: 680 });
+    await popup.waitForLoadState();
+    await popup.click('#range button[data-sec="60"]');
+    await popup.waitForTimeout(800);
+    check('graph window shows live readouts', /\d+°/.test(await popup.textContent('#r-nozzle')));
+    const popInk = await popup.evaluate(() => {
+      const c = document.querySelector('#graph-big'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n;
+    });
+    check('graph window draws the graph', popInk > 5000);
+    await popup.screenshot({ path: S + '/shots/p1-2-graph.png' });
+    check('graph window has no address key showing', !popup.url().includes('key='));
     // fan via console shows in graph data
     await page.fill('#cmd', 'M106 S255'); await page.press('#cmd', 'Enter');
 
@@ -98,19 +103,19 @@ const logHas = (page, text) => page.waitForFunction((t) => document.querySelecto
     await page.click('#heaters-off');
     await logHas(page, 'Heaters off.');
     check('heaters off', true);
-    await page.click('#everything-off');
-    await page.waitForSelector('#confirm-sheet:not([hidden])');
-    await page.click('#confirm-ok');
+    check('"Turn everything off" button is gone', (await page.$('#everything-off')) === null);
+    await page.fill('#cmd', 'off'); await page.press('#cmd', 'Enter');
     await logHas(page, 'Power supply off');
-    check('turn everything off (asks first)', true);
+    check('classic `off` command still works in the console', true);
 
     // dark + phone
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.waitForTimeout(500);
     await page.screenshot({ path: S + '/shots/p1-5-dark.png' });
-    await page.click('#graph-open'); await page.waitForTimeout(400);
-    await page.screenshot({ path: S + '/shots/p1-6-graph-dark.png' });
-    await page.keyboard.press('Escape');
+    await popup.emulateMedia({ colorScheme: 'dark' });
+    await popup.click('#range button[data-sec="300"]');
+    await popup.waitForTimeout(600);
+    await popup.screenshot({ path: S + '/shots/p1-6-graph-dark.png' });
     const phone = await (await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })).newPage();
     await phone.goto(url); await phone.waitForTimeout(1800);
     await phone.screenshot({ path: S + '/shots/p1-7-phone.png', fullPage: true });
