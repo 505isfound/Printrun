@@ -48,25 +48,25 @@ Printer ──USB── PC ┬─ Engine: Pronterface's own host code (pronsole 
 
 | | Feature | Status | How we test |
 |---|---|---|---|
-| [ ] | App window: double-click .exe, opens like a normal app | New | Launches on Windows |
-| [~] | Engine runs Pronterface's host code (`pronsole`/`printcore`) | Reused | Simulated printer connects |
-| [~] | Port list + rescan | Rebuilt | Printer's COM port appears |
+| [x] | App window: double-click .exe, opens like a normal app | New | Launches on Windows |
+| [x] | Engine runs Pronterface's host code (`pronsole`/`printcore`) | Reused | Simulated printer connects |
+| [x] | Port list + rescan | Rebuilt | Printer's COM port appears |
 | [ ] | Baud rate picker (+ remembers last) | Rebuilt | Connects at your printer's baud |
-| [ ] | Auto-detect port/baud | New | Finds printer with no setup |
-| [~] | Connect / Disconnect | Reused + Rebuilt | Real printer goes "online" |
+| [x] | Auto-detect port/baud | New | Finds printer with no setup |
+| [x] | Connect / Disconnect | Reused + Rebuilt | Real printer goes "online" |
 | [~] | Reset printer | Reused + Rebuilt | Printer resets |
-| [~] | DTR option (stops Arduino-based boards resetting on connect) | Reused | Setting respected |
+| [x] | DTR option (stops Arduino-based boards resetting on connect) | Reused | Setting respected |
 | [~] | TCP/network printers (`host:port`) + TCP streaming mode | Reused | Simulated network printer |
-| [~] | Command console: type G-code or Pronterface commands | Reused + Rebuilt | `M115` returns firmware info |
-| [ ] | All console commands work: connect, disconnect, load, print, pause, resume, reset, home, move, extrude, reverse, settemp, bedtemp, gettemp, tool, monitor, eta, ls, sdprint, upload, macro, set, gcodes, slice, run_script, run_gcode_script, shell, off, exit, help | Reused (help, settemp, bedtemp, set tested) |
+| [x] | Command console: type G-code or Pronterface commands | Reused + Rebuilt | `M115` returns firmware info |
+| [~] | All console commands work: connect, disconnect, load, print, pause, resume, reset, home, move, extrude, reverse, settemp, bedtemp, gettemp, tool, monitor, eta, ls, sdprint, upload, macro, set, gcodes, slice, run_script, run_gcode_script, shell, off, exit, help | Reused (help, settemp, bedtemp, set tested) |
 | [~] | Commands that only existed in the classic window: button, setspeed, setflow | Rebuilt |
 | [ ] | editgcode (classic-only) | Rebuilt in Phase 4 (Edit open file) | Each runs against simulated printer |
-| [~] | Log view, Clear log, Don't-autoscroll | Rebuilt | |
+| [x] | Log view, Clear log, Don't-autoscroll | Rebuilt | |
 | [~] | Debug communications (show raw traffic) | Reused + Rebuilt | |
 | [~] | Command history (up/down arrows, saved between runs) | Reused + Rebuilt | |
 | [ ] | Log to file (Log path setting) | Reused | File written |
 | [~] | Launch options: `-a` autoconnect, `-c` config file, `-e` run command, open file | Reused | |
-| [~] | Reads existing Pronterface settings file | Reused | Your settings show up |
+| [x] | Reads existing Pronterface settings file | Reused | Your settings show up |
 | [ ] | Keep PC awake while printing | Reused | PC doesn't sleep mid-print |
 | [~] | Custom port name pattern (Mac/Linux only) | Reused | |
 | [~] | Local status server (RPC on port 7978, this PC only): status, temps, load, start/pause/resume, home, connect, send | Reused | |

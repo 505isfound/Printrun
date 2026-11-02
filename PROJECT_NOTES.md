@@ -1,4 +1,4 @@
-# Project Notes (Keegan's Pronterface customization)
+# Project Notes: Project Layerline (Keegan's Pronterface rebuild)
 
 Running notes so any new Claude chat can pick up where we left off.
 
@@ -40,7 +40,10 @@ Running notes so any new Claude chat can pick up where we left off.
 
 ## Open questions / next steps
 - Keegan to test the Windows build of the classic-Pronterface changes with the real printer.
-- Phase 0 built (2026-11-01): see "Layerline code map" below. Waiting on Keegan's real-printer test.
+- Phase 0 done (2026-11-01): tested by Keegan on the Ender 5 Pro. Auto-detect found the printer, window opened,
+  M115/help/heat test worked. Next: Phase 1 (temps & safety, new graph).
+- Repo rename to `505isfound/Layerline` is up to Keegan (GitHub settings writes are blocked from Claude's session);
+  after renaming, re-attach the repo under the new name.
 
 ## Layerline code map
 - Start: `start_layerline.py` (repo root). Options: `-a` autoconnect, `--browser`, `--port 8086`,
