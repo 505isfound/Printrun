@@ -6,7 +6,7 @@ Running notes so any new Claude chat can pick up where we left off.
 - Fork: github.com/505isfound/printrun (forked from kliment/Printrun)
 - Target platform: **Windows**
 - Workflow: Claude edits and pushes to GitHub → GitHub Actions ("Build Windows Executable") builds Pronterface.exe → Keegan downloads it from the Actions tab and tests with the printer. GitHub Desktop "Fetch origin"/"Pull" keeps the local copy in sync.
-- Printer: older, USB-only
+- Printer: Creality Ender 5 Pro (Keegan's only printer; connected over USB)
 - Testing on Claude's side: wxPython via apt (`python3-wxgtk4.0`, works with python3.12 only) + `pyglet<2`, run under `xvfb-run`. Pronterface redirects stdout into its log, so test scripts must write results to a file.
 
 ## Done (2026-10-31)
@@ -40,5 +40,18 @@ Running notes so any new Claude chat can pick up where we left off.
 
 ## Open questions / next steps
 - Keegan to test the Windows build of the classic-Pronterface changes with the real printer.
-- Decisions in FEATURE_CHECKLIST.md: niche Phase 8 tools, which printer(s) to test on, app name.
-- Next: start Phase 0 (foundation).
+- Pick a new name (working name "Pronterface Web").
+- Phase 0 built (2026-11-01): see "Pronterface Web code map" below. Waiting on Keegan's real-printer test.
+
+## Pronterface Web code map
+- Start: `pronterfaceweb.py` (repo root). Options: `-a` autoconnect, `--browser`, `--port 8086`,
+  `--selftest result.txt`, plus pronsole's `-c/-e/-v/file`.
+- `web/pronterface_web/engine.py` – `WebHost(pronsole)`: command worker thread, log capture, snapshot(),
+  classic-only commands (button/setspeed/setflow), autoconnect, history (shared file).
+- `web/pronterface_web/server.py` – aiohttp on 127.0.0.1, random access key per launch (cookie),
+  websocket origin check, `/api/initial`, `/ws` actions: command/connect/disconnect/reset/rescan/debug/set/clearlog/quit.
+- `web/pronterface_web/static/` – index.html, app.css (iOS look; tokens at top), app.js (vanilla JS, no build step).
+- `web/pronterface_web/fake_printer.py` – simulated Marlin/Ender 5 Pro over TCP (`127.0.0.1:port`).
+- `web/tests/` – pytest; `.github/workflows/build-web-win.yml` – tests, builds PronterfaceWeb.exe, runs --selftest.
+- Local testing here: python3.12 + apt `python3-wxgtk4.0` + pip `aiohttp "pyglet<2"`; browser E2E via Playwright.
+- Security note for Phase 7: the `shell` command runs Python — must be blocked for network (non-local) users.

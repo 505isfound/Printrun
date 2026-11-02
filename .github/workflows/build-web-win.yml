@@ -1,0 +1,57 @@
+name: Build Pronterface Web (Windows)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.12'
+        architecture: x64
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pyinstaller setuptools wheel cython -r requirements.txt -r web/requirements.txt
+
+    - name: Run the automated tests
+      run: |
+        python -m pip install pytest
+        python -m pytest -q web/tests -p no:cacheprovider
+
+    - name: Build Cython G-code reader (faster, less memory)
+      run: python setup.py build_ext --inplace
+
+    - name: Build the app
+      run: >
+        pyinstaller --clean -y -F -w
+        --name "PronterfaceWeb"
+        -i "./assets_raw/icons/pronterface.ico"
+        --paths web --paths .
+        --add-data "web/pronterface_web/static;pronterface_web/static"
+        --add-data "printrun/assets;printrun/assets"
+        --collect-submodules printrun
+        --collect-submodules pronterface_web
+        --collect-all webview
+        pronterfaceweb.py
+
+    - name: Self-test the built app against a simulated printer
+      shell: pwsh
+      run: |
+        $p = Start-Process -FilePath "dist\PronterfaceWeb.exe" -ArgumentList "--selftest","selftest.txt" -Wait -PassThru
+        Get-Content selftest.txt
+        if ($p.ExitCode -ne 0) { throw "Self-test failed (exit $($p.ExitCode))" }
+
+    - name: Upload the app
+      uses: actions/upload-artifact@v7
+      with:
+        name: PronterfaceWeb-windows
+        path: dist/PronterfaceWeb.exe

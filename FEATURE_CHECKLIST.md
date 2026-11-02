@@ -4,6 +4,8 @@ The "nothing lost" list for rebuilding Pronterface with a modern web-based inter
 Every feature of the current Pronterface is listed here. A phase isn't done until every
 item in it is checked off and tested on a real printer.
 
+**Status boxes:** `[ ]` not started · `[~]` built and passing on the simulated printer, waiting for a real-printer test · `[x]` done (tested on the Ender 5 Pro)
+
 **Legend**
 - **Reused**: existing Pronterface code, used unchanged
 - **Rebuilt**: same feature, new interface
@@ -47,25 +49,27 @@ Printer ──USB── PC ┬─ Engine: Pronterface's own host code (pronsole 
 | | Feature | Status | How we test |
 |---|---|---|---|
 | [ ] | App window: double-click .exe, opens like a normal app | New | Launches on Windows |
-| [ ] | Engine runs Pronterface's host code (`pronsole`/`printcore`) | Reused | Simulated printer connects |
-| [ ] | Port list + rescan | Rebuilt | Printer's COM port appears |
+| [~] | Engine runs Pronterface's host code (`pronsole`/`printcore`) | Reused | Simulated printer connects |
+| [~] | Port list + rescan | Rebuilt | Printer's COM port appears |
 | [ ] | Baud rate picker (+ remembers last) | Rebuilt | Connects at your printer's baud |
 | [ ] | Auto-detect port/baud | New | Finds printer with no setup |
-| [ ] | Connect / Disconnect | Reused + Rebuilt | Real printer goes "online" |
-| [ ] | Reset printer | Reused + Rebuilt | Printer resets |
-| [ ] | DTR option (stops Arduino-based boards resetting on connect) | Reused | Setting respected |
-| [ ] | TCP/network printers (`host:port`) + TCP streaming mode | Reused | Simulated network printer |
-| [ ] | Command console: type G-code or Pronterface commands | Reused + Rebuilt | `M115` returns firmware info |
-| [ ] | All console commands work: connect, disconnect, load, print, pause, resume, reset, home, move, extrude, reverse, settemp, bedtemp, gettemp, tool, setspeed, setflow, monitor, eta, ls, sdprint, upload, macro, button, set, gcodes, slice, run_script, run_gcode_script, shell, off, exit | Reused | Each runs against simulated printer |
-| [ ] | Log view, Clear log, Don't-autoscroll | Rebuilt | |
-| [ ] | Debug communications (show raw traffic) | Reused + Rebuilt | |
-| [ ] | Command history (up/down arrows, saved between runs) | Reused + Rebuilt | |
+| [~] | Connect / Disconnect | Reused + Rebuilt | Real printer goes "online" |
+| [~] | Reset printer | Reused + Rebuilt | Printer resets |
+| [~] | DTR option (stops Arduino-based boards resetting on connect) | Reused | Setting respected |
+| [~] | TCP/network printers (`host:port`) + TCP streaming mode | Reused | Simulated network printer |
+| [~] | Command console: type G-code or Pronterface commands | Reused + Rebuilt | `M115` returns firmware info |
+| [ ] | All console commands work: connect, disconnect, load, print, pause, resume, reset, home, move, extrude, reverse, settemp, bedtemp, gettemp, tool, monitor, eta, ls, sdprint, upload, macro, set, gcodes, slice, run_script, run_gcode_script, shell, off, exit, help | Reused (help, settemp, bedtemp, set tested) |
+| [~] | Commands that only existed in the classic window: button, setspeed, setflow | Rebuilt |
+| [ ] | editgcode (classic-only) | Rebuilt in Phase 4 (Edit open file) | Each runs against simulated printer |
+| [~] | Log view, Clear log, Don't-autoscroll | Rebuilt | |
+| [~] | Debug communications (show raw traffic) | Reused + Rebuilt | |
+| [~] | Command history (up/down arrows, saved between runs) | Reused + Rebuilt | |
 | [ ] | Log to file (Log path setting) | Reused | File written |
-| [ ] | Launch options: `-a` autoconnect, `-c` config file, `-e` run command, open file | Reused | |
-| [ ] | Reads existing Pronterface settings file | Reused | Your settings show up |
+| [~] | Launch options: `-a` autoconnect, `-c` config file, `-e` run command, open file | Reused | |
+| [~] | Reads existing Pronterface settings file | Reused | Your settings show up |
 | [ ] | Keep PC awake while printing | Reused | PC doesn't sleep mid-print |
-| [ ] | Custom port name pattern (Mac/Linux only) | Reused | |
-| [ ] | Local status server (RPC on port 7978, this PC only): status, temps, load, start/pause/resume, home, connect, send | Reused | |
+| [~] | Custom port name pattern (Mac/Linux only) | Reused | |
+| [~] | Local status server (RPC on port 7978, this PC only): status, temps, load, start/pause/resume, home, connect, send | Reused | |
 
 ## Phase 1: Temperatures & safety
 
@@ -172,16 +176,15 @@ Printer ──USB── PC ┬─ Engine: Pronterface's own host code (pronsole 
 | [ ] | Spool manager (track filament per spool) | Reused + Rebuilt | |
 | [ ] | G-code plater (combine G-code files onto one plate) | Reused + Rebuilt | |
 | [ ] | Slice command (send an STL to your slicer from the app) + open slicer settings | Reused + Rebuilt | |
-| [ ] | STL plater (arrange 3D models) | Needs your call | |
-| [ ] | Old Slic3r integration (pick Slic3r profiles from a menu) | Needs your call | |
-| [ ] | Layer projector (for DLP resin printers) | Needs your call | |
+| — | STL plater (arrange 3D models) | Skipped: stays in classic Pronterface | |
+| — | Old Slic3r integration (pick Slic3r profiles from a menu) | Skipped: stays in classic Pronterface | |
+| — | Layer projector (for DLP resin printers) | Skipped: stays in classic Pronterface | |
 
 ---
 
-## Decisions needed (before the phase they affect)
+## Decisions
 
-1. **Phase 8 niche tools:** the STL plater, old Slic3r integration, and projector are for
-   workflows most people no longer use (modern slicers replaced the first two; the projector
-   is for resin printers). Rebuild them anyway, or leave them in classic Pronterface?
-2. **Test printers:** which printer(s) do we test each phase on?
-3. **Name** for the new app (working name: "Pronterface Web").
+1. **Phase 8 niche tools:** skipped (decided 2026-11-01). STL plater, old Slic3r integration and
+   the resin projector stay available in classic Pronterface.
+2. **Test printer:** Creality Ender 5 Pro (Keegan's only printer).
+3. **Name:** "Pronterface Web" for now; a new name is still to be picked.

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pronterface Web</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <h1 class="app-name">Pronterface Web</h1>
+  <div class="conn" id="conn" data-state="offline">
+    <span class="conn-dot" aria-hidden="true"></span>
+    <span id="conn-text">Not connected</span>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="side">
+    <section class="group" aria-labelledby="printer-h">
+      <h2 class="group-title" id="printer-h">Printer</h2>
+      <div class="list">
+        <label class="row">
+          <span class="row-label">Port</span>
+          <span class="row-control">
+            <select id="port"></select>
+            <button class="link" id="rescan" type="button" title="Look for printers again">Rescan</button>
+          </span>
+        </label>
+        <label class="row" id="custom-row" hidden>
+          <span class="row-label">Address</span>
+          <input id="custom-port" class="text" placeholder="COM5 or 192.168.1.20:8080" spellcheck="false">
+        </label>
+        <div class="row row-stack">
+          <span class="row-label" id="baud-label">Speed</span>
+          <div class="segmented" id="baud" role="radiogroup" aria-labelledby="baud-label"></div>
+          <select id="baud-other" class="baud-other" hidden aria-label="Other speed"></select>
+        </div>
+        <label class="row">
+          <span class="row-label">Reset board when connecting<small>Turn off if your printer restarts every time you connect</small></span>
+          <input type="checkbox" class="switch" id="dtr">
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="connect" type="button">Connect</button>
+        <button class="btn" id="reset" type="button" title="Restart the printer's controller board">Reset printer</button>
+      </div>
+    </section>
+
+    <section class="group" aria-labelledby="temps-h">
+      <h2 class="group-title" id="temps-h">Temperatures</h2>
+      <div class="temps">
+        <div class="temp" data-kind="nozzle">
+          <span class="temp-name">Nozzle</span>
+          <span class="temp-now" id="nozzle-now">—</span>
+          <span class="temp-sub" id="nozzle-sub">Not connected</span>
+        </div>
+        <div class="temp" data-kind="bed">
+          <span class="temp-name">Bed</span>
+          <span class="temp-now" id="bed-now">—</span>
+          <span class="temp-sub" id="bed-sub">Not connected</span>
+        </div>
+      </div>
+      <p class="note">Heating controls, the graph, printing and movement arrive in the next phases. Until then, type any command in the console.</p>
+    </section>
+  </aside>
+
+  <section class="console" aria-labelledby="console-h">
+    <div class="console-head">
+      <h2 class="group-title" id="console-h">Console</h2>
+      <div class="console-tools">
+        <label class="mini-toggle" title="Show every line sent to and received from the printer">
+          <input type="checkbox" id="debug"> All printer traffic
+        </label>
+        <label class="mini-toggle">
+          <input type="checkbox" id="autoscroll" checked> Follow new lines
+        </label>
+        <button class="link" id="clear" type="button">Clear</button>
+      </div>
+    </div>
+    <div class="log" id="log" role="log" aria-live="polite" tabindex="0">
+      <p class="log-empty" id="log-empty">Connect to your printer to get started. You can type G-code (like <code>M115</code>) or Pronterface commands (like <code>help</code>) below.</p>
+    </div>
+    <form class="console-input" id="console-form" autocomplete="off">
+      <input id="cmd" class="text mono" placeholder="Type a command" spellcheck="false" aria-label="Command">
+      <button class="btn primary" type="submit">Send</button>
+    </form>
+  </section>
+</main>
+
+<div class="sheet-backdrop" id="close-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="close-title">
+    <h2 id="close-title">A print is running</h2>
+    <p>Closing stops sending the print to the printer. Heaters are left as they are.</p>
+    <div class="sheet-actions">
+      <button class="btn" id="close-cancel" type="button">Keep printing</button>
+      <button class="btn danger" id="close-confirm" type="button">Close anyway</button>
+    </div>
+  </div>
+</div>
+
+<div class="banner" id="banner" hidden>Lost contact with the app. Reconnecting…</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
