@@ -14,15 +14,16 @@ import socket
 import threading
 import time
 
-FIRMWARE = ("FIRMWARE_NAME:Marlin 2.0.9.3 (Simulated) SOURCE_CODE_URL:github.com/MarlinFirmware/Marlin "
-            "PROTOCOL_VERSION:1.0 MACHINE_TYPE:Ender-5 Pro EXTRUDER_COUNT:1")
+FIRMWARE_FMT = ("FIRMWARE_NAME:Marlin 2.0.9.3 (Simulated) SOURCE_CODE_URL:github.com/MarlinFirmware/Marlin "
+            "PROTOCOL_VERSION:1.0 MACHINE_TYPE:Ender-5 Pro EXTRUDER_COUNT:%d")
 
 LINE_NUMBER = re.compile(r"^N\d+\s+")
 CHECKSUM = re.compile(r"\*\d+\s*$")
 
 
 class FakePrinter:
-    def __init__(self, port=0, host="127.0.0.1"):
+    def __init__(self, port=0, host="127.0.0.1", tools=1):
+        self.tools = tools
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((host, port))
@@ -43,6 +44,8 @@ class FakePrinter:
     def reset_state(self):
         with self.lock:
             self.nozzle, self.nozzle_target = 24.0, 0.0
+            self.extra = [[24.0, 0.0] for _ in range(self.tools - 1)]   # tools 1.. on multi-extruder
+            self.active = 0
             self.bed, self.bed_target = 23.0, 0.0
             self.pos = {"X": 0.0, "Y": 0.0, "Z": 0.0, "E": 0.0}
             self.fan = 0
@@ -57,12 +60,18 @@ class FakePrinter:
                     cur = getattr(self, name)
                     tgt = getattr(self, name + "_target") or 22.0
                     setattr(self, name, cur + (tgt - cur) * rate)
+                for t in self.extra:
+                    t[0] += ((t[1] or 22.0) - t[0]) * 0.18
             time.sleep(0.5)
 
     def temp_report(self):
         with self.lock:
-            return "T:%.2f /%.2f B:%.2f /%.2f @:0 B@:0" % (
-                self.nozzle, self.nozzle_target, self.bed, self.bed_target)
+            temps = [(self.nozzle, self.nozzle_target)] + [tuple(t) for t in self.extra]
+            act = temps[self.active]
+            out = "T:%.2f /%.2f B:%.2f /%.2f" % (act[0], act[1], self.bed, self.bed_target)
+            if self.tools > 1:
+                out += "".join(" T%d:%.2f /%.2f" % (i, c, t) for i, (c, t) in enumerate(temps))
+            return out + " @:0 B@:0"
 
     # -- networking ----------------------------------------------------
     def _serve(self):
@@ -110,7 +119,13 @@ class FakePrinter:
             if cmd == "M105":
                 pass
             elif cmd in ("M104", "M109") and "S" in args:
-                self.nozzle_target = args["S"]
+                tool = int(args["T"]) if isinstance(args.get("T"), float) else self.active
+                if tool == 0:
+                    self.nozzle_target = args["S"]
+                elif tool - 1 < len(self.extra):
+                    self.extra[tool - 1][1] = args["S"]
+            elif re.match(r"^T\d+$", cmd):
+                self.active = min(int(cmd[1:]), self.tools - 1)
             elif cmd in ("M140", "M190") and "S" in args:
                 self.bed_target = args["S"]
             elif cmd == "M106":
@@ -140,7 +155,7 @@ class FakePrinter:
         if cmd == "M105":
             return "ok " + self.temp_report() + "\n"
         if cmd == "M115":
-            return FIRMWARE + "\nCap:AUTOREPORT_TEMP:1\nok\n"
+            return FIRMWARE_FMT % self.tools + "\nCap:AUTOREPORT_TEMP:1\nok\n"
         if cmd == "M114":
             p = self.pos
             return "X:%.2f Y:%.2f Z:%.2f E:%.2f Count X:0 Y:0 Z:0\nok\n" % (p["X"], p["Y"], p["Z"], p["E"])

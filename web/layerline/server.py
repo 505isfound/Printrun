@@ -114,6 +114,8 @@ class Server:
             "history": e.read_history(),
             "log": self.backlog[-LOG_BACKLOG:],
             "buttons": e.custombuttons,
+            "temp_history": list(e.temp_history),
+            "settings_info": e.settings_info(),
         })
 
     async def websocket(self, request):
@@ -151,10 +153,24 @@ class Server:
             await ws.send_str(json.dumps({"type": "ports", "ports": ports}))
         elif action == "debug":
             e.set_debug(msg.get("on"))
-        elif action == "set":
-            name, value = str(msg.get("name")), str(msg.get("value"))
-            if name in ("dtr",):
-                e.submit("set %s %s" % (name, value))
+        elif action == "setting":
+            e.set_setting(str(msg.get("name")), str(msg.get("value")))
+        elif action == "settemp":
+            e.set_temp(msg.get("heater"), msg.get("value"), bool(msg.get("confirmed")))
+        elif action == "preheat":
+            e.preheat(str(msg.get("material")))
+        elif action == "heaters_off":
+            e.heaters_off()
+        elif action == "motors_off":
+            e.motors_off()
+        elif action == "everything_off":
+            e.everything_off()
+        elif action == "clear_all":
+            e.clear_all()
+        elif action == "tool":
+            e.set_tool(msg.get("tool", 0))
+        elif action == "lock":
+            e.set_locked(msg.get("on"))
         elif action == "clearlog":
             self.backlog.clear()
         elif action == "quit":

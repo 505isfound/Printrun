@@ -9,59 +9,124 @@
 <body>
 <header class="topbar">
   <h1 class="app-name">Layerline</h1>
-  <div class="conn" id="conn" data-state="offline">
-    <span class="conn-dot" aria-hidden="true"></span>
-    <span id="conn-text">Not connected</span>
+  <div class="top-actions">
+    <button class="icon-btn" id="lock" type="button" hidden aria-pressed="false" title="Lock the controls">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path class="shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <span id="lock-text">Lock</span>
+    </button>
+    <button class="icon-btn" id="settings-btn" type="button" title="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>
+      <span>Settings</span>
+    </button>
+    <div class="conn" id="conn" data-state="offline">
+      <span class="conn-dot" aria-hidden="true"></span>
+      <span id="conn-text">Not connected</span>
+    </div>
   </div>
 </header>
 
+<section class="strip" id="strip" aria-label="Printer status">
+  <div class="strip-temp" data-kind="nozzle">
+    <span class="strip-label">Nozzle</span>
+    <span class="strip-big"><span id="s-nozzle">—</span><span class="strip-target" id="s-nozzle-t"></span></span>
+    <span class="gauge" hidden><span id="g-nozzle"></span></span>
+  </div>
+  <div class="strip-temp" data-kind="bed">
+    <span class="strip-label">Bed</span>
+    <span class="strip-big"><span id="s-bed">—</span><span class="strip-target" id="s-bed-t"></span></span>
+    <span class="gauge" hidden><span id="g-bed"></span></span>
+  </div>
+  <div class="strip-tools" id="s-tools" hidden></div>
+  <div class="strip-job">
+    <span class="strip-state" id="s-state">Not connected</span>
+    <span class="bar"><span id="s-bar"></span></span>
+  </div>
+  <div class="strip-stat"><span class="strip-label">Progress</span><span class="strip-num" id="s-progress">—</span></div>
+  <div class="strip-stat"><span class="strip-label">Time left</span><span class="strip-num" id="s-left">—</span></div>
+  <div class="strip-stat"><span class="strip-label">Height</span><span class="strip-num" id="s-height">—</span></div>
+</section>
+
 <main class="layout">
   <aside class="side">
-    <section class="group" aria-labelledby="printer-h">
-      <h2 class="group-title" id="printer-h">Printer</h2>
+    <section class="group lockable" aria-labelledby="temps-h">
+      <h2 class="group-title" id="temps-h">Temperatures</h2>
       <div class="list">
-        <label class="row">
+        <div class="row" id="tool-row" hidden>
+          <span class="row-label" id="tool-label">Active nozzle</span>
+          <div class="segmented" id="tools" role="radiogroup" aria-labelledby="tool-label"></div>
+        </div>
+        <form class="row heater" data-heater="nozzle">
+          <span class="row-label"><span class="dot-label" data-kind="nozzle">Nozzle</span><small id="nozzle-now">Not connected</small></span>
+          <span class="row-control">
+            <span class="num-wrap"><input class="num" id="nozzle-target" type="number" min="0" max="400" step="1" inputmode="numeric" aria-label="Nozzle target temperature"><span class="unit">°</span></span>
+            <button class="pill" type="submit">Set</button>
+            <button class="pill plain" type="button" data-off>Off</button>
+          </span>
+        </form>
+        <form class="row heater" data-heater="bed">
+          <span class="row-label"><span class="dot-label" data-kind="bed">Bed</span><small id="bed-now">Not connected</small></span>
+          <span class="row-control">
+            <span class="num-wrap"><input class="num" id="bed-target" type="number" min="0" max="150" step="1" inputmode="numeric" aria-label="Bed target temperature"><span class="unit">°</span></span>
+            <button class="pill" type="submit">Set</button>
+            <button class="pill plain" type="button" data-off>Off</button>
+          </span>
+        </form>
+        <div class="row row-stack">
+          <span class="row-label">Preheat<small>Sets nozzle and bed together</small></span>
+          <div class="presets" id="presets"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="group lockable" aria-labelledby="safety-h">
+      <h2 class="group-title" id="safety-h">Safety</h2>
+      <div class="safety">
+        <button class="tile" id="heaters-off" type="button"><strong>Heaters off</strong><small>Nozzle and bed</small></button>
+        <button class="tile" id="motors-off" type="button"><strong>Motors off</strong><small>Axes move freely by hand</small></button>
+        <button class="tile" id="everything-off" type="button"><strong>Turn everything off</strong><small>Motors, heaters, fan and printer power</small></button>
+        <button class="tile danger" id="clear-all" type="button"><strong>Clear all</strong><small>Cancel print, all off, unload file</small></button>
+      </div>
+    </section>
+    <section class="group" id="graph-group" aria-labelledby="graph-h">
+      <h2 class="group-title" id="graph-h">Last minute</h2>
+      <button class="graph-card" id="graph-open" type="button" aria-label="Open the large temperature graph">
+        <span class="graph-legend">
+          <span class="dot-label" data-kind="nozzle">Nozzle</span><span class="legend-val" id="l-nozzle">—</span>
+          <span class="dot-label" data-kind="bed">Bed</span><span class="legend-val" id="l-bed">—</span>
+        </span>
+        <canvas id="graph-small" height="170"></canvas>
+        <span class="graph-hint">Click to expand</span>
+      </button>
+    </section>
+
+
+    <section class="group lockable" aria-labelledby="printer-h">
+      <h2 class="group-title" id="printer-h">Connection</h2>
+      <div class="list">
+        <div class="row" id="conn-summary" hidden>
+          <span class="row-label">Connected<small id="conn-summary-text"></small></span>
+        </div>
+        <label class="row offline-only">
           <span class="row-label">Port</span>
           <span class="row-control">
             <select id="port"></select>
             <button class="link" id="rescan" type="button" title="Look for printers again">Rescan</button>
           </span>
         </label>
-        <label class="row" id="custom-row" hidden>
+        <label class="row offline-only" id="custom-row" hidden>
           <span class="row-label">Address</span>
           <input id="custom-port" class="text" placeholder="COM5 or 192.168.1.20:8080" spellcheck="false">
         </label>
-        <div class="row row-stack">
+        <div class="row row-stack offline-only">
           <span class="row-label" id="baud-label">Speed</span>
           <div class="segmented" id="baud" role="radiogroup" aria-labelledby="baud-label"></div>
           <select id="baud-other" class="baud-other" hidden aria-label="Other speed"></select>
         </div>
-        <label class="row">
-          <span class="row-label">Reset board when connecting<small>Turn off if your printer restarts every time you connect</small></span>
-          <input type="checkbox" class="switch" id="dtr">
-        </label>
       </div>
       <div class="actions">
         <button class="btn primary" id="connect" type="button">Connect</button>
         <button class="btn" id="reset" type="button" title="Restart the printer's controller board">Reset printer</button>
       </div>
-    </section>
-
-    <section class="group" aria-labelledby="temps-h">
-      <h2 class="group-title" id="temps-h">Temperatures</h2>
-      <div class="temps">
-        <div class="temp" data-kind="nozzle">
-          <span class="temp-name">Nozzle</span>
-          <span class="temp-now" id="nozzle-now">—</span>
-          <span class="temp-sub" id="nozzle-sub">Not connected</span>
-        </div>
-        <div class="temp" data-kind="bed">
-          <span class="temp-name">Bed</span>
-          <span class="temp-now" id="bed-now">—</span>
-          <span class="temp-sub" id="bed-sub">Not connected</span>
-        </div>
-      </div>
-      <p class="note">Heating controls, the graph, printing and movement arrive in the next phases. Until then, type any command in the console.</p>
     </section>
   </aside>
 
@@ -78,28 +143,62 @@
         <button class="link" id="clear" type="button">Clear</button>
       </div>
     </div>
-    <div class="log" id="log" role="log" aria-live="polite" tabindex="0">
-      <p class="log-empty" id="log-empty">Connect to your printer to get started. You can type G-code (like <code>M115</code>) or Pronterface commands (like <code>help</code>) below.</p>
-    </div>
-    <form class="console-input" id="console-form" autocomplete="off">
+    <div class="log" id="log" role="log" aria-live="polite" tabindex="0"><p class="log-empty" id="log-empty">Connect to your printer to get started. You can type G-code (like <code>M115</code>) or Pronterface commands (like <code>help</code>) below.</p></div>
+    <form class="console-input lockable" id="console-form" autocomplete="off">
       <input id="cmd" class="text mono" placeholder="Type a command" spellcheck="false" aria-label="Command">
       <button class="btn primary" type="submit">Send</button>
     </form>
   </section>
 </main>
 
-<div class="sheet-backdrop" id="close-sheet" hidden>
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="close-title">
-    <h2 id="close-title">A print is running</h2>
-    <p>Closing stops sending the print to the printer. Heaters are left as they are.</p>
+<!-- Large graph -->
+<div class="sheet-backdrop" id="graph-sheet" hidden>
+  <div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-labelledby="graph-title">
+    <div class="sheet-head">
+      <h2 id="graph-title" class="visually-hidden">Temperature graph</h2>
+      <div class="readouts">
+        <div class="readout" data-kind="nozzle"><span class="dot-label" data-kind="nozzle">Nozzle</span><span class="readout-big" id="r-nozzle">—</span><span class="readout-sub" id="r-nozzle-sub"></span></div>
+        <div class="readout" data-kind="bed"><span class="dot-label" data-kind="bed">Bed</span><span class="readout-big" id="r-bed">—</span><span class="readout-sub" id="r-bed-sub"></span></div>
+      </div>
+      <div class="sheet-tools">
+        <div class="segmented" id="range" role="radiogroup" aria-label="Time range">
+          <button type="button" role="radio" data-sec="60" aria-checked="false">1 min</button>
+          <button type="button" role="radio" data-sec="300" aria-checked="true">5 min</button>
+          <button type="button" role="radio" data-sec="900" aria-checked="false">15 min</button>
+        </div>
+        <button class="link" id="graph-close" type="button">Done</button>
+      </div>
+    </div>
+    <canvas id="graph-big" height="460"></canvas>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="sheet-backdrop" id="settings-sheet" hidden>
+  <div class="sheet sheet-settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="sheet-head">
+      <h2 id="settings-title">Settings</h2>
+      <button class="link" id="settings-close" type="button">Done</button>
+    </div>
+    <div id="settings-body"></div>
+    <p class="note">More settings arrive in Phase 5. Until then, the console's <code>set</code> command changes any of Pronterface's settings.</p>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="sheet-backdrop" id="confirm-sheet" hidden>
+  <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-body"></p>
     <div class="sheet-actions">
-      <button class="btn" id="close-cancel" type="button">Keep printing</button>
-      <button class="btn danger" id="close-confirm" type="button">Close anyway</button>
+      <button class="btn" id="confirm-cancel" type="button">Cancel</button>
+      <button class="btn danger" id="confirm-ok" type="button">OK</button>
     </div>
   </div>
 </div>
 
 <div class="banner" id="banner" hidden>Lost contact with the app. Reconnecting…</div>
+<script src="/static/graph.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

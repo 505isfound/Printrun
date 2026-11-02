@@ -41,7 +41,9 @@ Running notes so any new Claude chat can pick up where we left off.
 ## Open questions / next steps
 - Keegan to test the Windows build of the classic-Pronterface changes with the real printer.
 - Phase 0 done (2026-11-01): tested by Keegan on the Ender 5 Pro. Auto-detect found the printer, window opened,
-  M115/help/heat test worked. Next: Phase 1 (temps & safety, new graph).
+  M115/help/heat test worked.
+- Phase 1 built (2026-11-02): temps & safety, new graph, status strip, settings sheet, lock, multi-extruder.
+  Passing on simulated printer (18 pytest + 13 + 16 browser checks). Waiting on Keegan's real-printer test.
 - Repo rename to `505isfound/Layerline` is up to Keegan (GitHub settings writes are blocked from Claude's session);
   after renaming, re-attach the repo under the new name.
 
@@ -54,6 +56,7 @@ Running notes so any new Claude chat can pick up where we left off.
   websocket origin check, `/api/initial`, `/ws` actions: command/connect/disconnect/reset/rescan/debug/set/clearlog/quit.
 - `web/layerline/static/` – index.html, app.css (iOS look; tokens at top), app.js (vanilla JS, no build step).
 - `web/layerline/fake_printer.py` – simulated Marlin/Ender 5 Pro over TCP (`127.0.0.1:port`).
-- `web/tests/` – pytest; `.github/workflows/build-web-win.yml` – tests, builds Layerline.exe, runs --selftest.
+- `web/layerline/static/graph.js` – canvas temperature graph (small + expanded).
+- `web/tests/` – pytest; `web/tests/browser/phase*.js` – Playwright click-throughs (node phaseN.js <scratch dir>; need fake printer + app ports free); `.github/workflows/build-web-win.yml` – tests, builds Layerline.exe, runs --selftest.
 - Local testing here: python3.12 + apt `python3-wxgtk4.0` + pip `aiohttp "pyglet<2"`; browser E2E via Playwright.
 - Security note for Phase 7: the `shell` command runs Python — must be blocked for network (non-local) users.

@@ -11,6 +11,7 @@ This file only:
   * replaces the terminal-only bits (y/n prompts, prompt printing).
 """
 
+import collections
 import logging
 import queue
 import re
@@ -18,12 +19,24 @@ import threading
 import time
 import traceback
 
-from printrun import pronsole
-from printrun.settings import HiddenSetting
+from printrun import gcoder, pronsole
+from printrun.settings import BooleanSetting, HiddenSetting, SpinSetting
+from printrun.utils import parse_temperature_report
 
 BAUD_RATES = [2400, 9600, 19200, 38400, 57600, 115200, 250000, 500000, 1000000]
 AUTO_BAUDS = [115200, 250000]   # Marlin's usual speeds; Ender 5 Pro uses 115200
 MAX_CUSTOM_BUTTONS = 64
+HISTORY_SECONDS = 15 * 60       # longest graph range
+HIGH_NOZZLE_TEMP = 250          # classic asks before going above this
+MATERIALS = ("PLA", "PETG", "ABS")
+
+# Settings the interface may change (anything else goes through `set` in the console)
+EDITABLE_SETTINGS = {
+    "monitor", "extruders", "tempgraph", "tempgauges", "statuspanel", "lockbox", "lockonstart",
+    "heaters_off_on_exit", "dtr",
+    "temperature_pla", "bedtemp_pla", "temperature_petg", "bedtemp_petg",
+    "temperature_abs", "bedtemp_abs",
+}
 
 # Settings the classic Pronterface window stores in the same settings file.
 # The engine doesn't use them yet, but knowing their names avoids
@@ -60,8 +73,15 @@ class WebHost(pronsole.pronsole):
         self._autoconnecting = False
         self.custombuttons = []
         self.quit_requested = False
+        self.temp_history = collections.deque()
+        self.fan = 0                        # percent, from M106/M107 sent to the printer
+        self.tool_temps = {}                # {"T0": [current, target], ...} for multi-extruder printers
+        self.locked = False
+        self._confirmed = False
         super().__init__()
         self.stdout = _LogWriter()          # where `help` and friends write
+        self._add_interface_settings()
+        self.p.callback.send = self._sentcb
         # Classic code creates only the last folder level; make the whole path
         self.config_dir.mkdir(parents=True, exist_ok=True)
         # The printer engine reports "online" through this callback
@@ -73,8 +93,192 @@ class WebHost(pronsole.pronsole):
         # The classic console asked "y/n" in the terminal. The interface asks
         # its own questions before sending risky commands, so typed commands
         # that need confirmation are refused rather than guessed.
+        if self._confirmed:
+            return True
         self.log("This needs confirmation; use the button in the interface instead.")
         return False
+
+    def _add_interface_settings(self):
+        """Settings the classic window added on top of pronsole's (same names and defaults)."""
+        add = self.settings._add
+        add(BooleanSetting("monitor", True, "Monitor printer status",
+                           "Regularly ask the printer for temperatures (needed for the graph and readouts)", "Printer"))
+        add(SpinSetting("extruders", 0, 1, 5, "Extruders count", "Number of extruders", "Printer"))
+        add(BooleanSetting("tempgraph", True, "Display temperature graph", "Display time-lapse temperature graph", "UI"))
+        add(BooleanSetting("tempgauges", False, "Display temperature gauges",
+                           "Show a bar under each temperature for how close it is to its target", "UI"))
+        add(BooleanSetting("statuspanel", True, "Display big status panel",
+                           "Show the large strip with temperatures and print progress", "UI"))
+        add(BooleanSetting("lockbox", False, "Display interface lock",
+                           "Show a lock button that disables most controls", "UI"))
+        add(BooleanSetting("lockonstart", False, "Lock interface upon print start",
+                           "If the lock is shown, lock the interface when a print starts", "UI"))
+        add(BooleanSetting("heaters_off_on_exit", False, "Turn heaters off when closing",
+                           "Switch the nozzle and bed heaters off when the app closes. Off by default: heaters are left as they are.", "Printer"))
+
+    # -- temperatures, fan, tools ------------------------------------------
+    def statuschecker(self):
+        # Same loop as classic, honouring the "Monitor printer status" setting
+        while self.statuscheck:
+            self.statuschecker_inner(self.settings.monitor)
+
+    def recvcb(self, l):
+        super().recvcb(l)
+        if "T:" in l or "B:" in l:
+            temps = parse_temperature_report(l)
+            if temps:
+                self._record_temps(temps)
+
+    def _record_temps(self, temps):
+        for name, (cur, tgt) in temps.items():
+            if name.startswith("T") and cur:
+                key = "T0" if name == "T" else name
+                old = self.tool_temps.get(key, [0.0, 0.0])
+                self.tool_temps[key] = [float(cur), float(tgt) if tgt else old[1]]
+        s = self.status
+        sample = {"t": time.time(), "n": s.extruder_temp, "nt": s.extruder_temp_target,
+                  "b": s.bed_temp, "bt": s.bed_temp_target, "f": self.fan}
+        self.temp_history.append(sample)
+        cutoff = sample["t"] - HISTORY_SECONDS
+        while self.temp_history and self.temp_history[0]["t"] < cutoff:
+            self.temp_history.popleft()
+        self._emit({"type": "temps", "sample": sample})
+
+    def _sentcb(self, command, gline):
+        """Watch commands going to the printer (like classic Pronterface did)."""
+        if not gline:
+            return
+        c = gline.command
+        if c in ("M104", "M109", "M140", "M190"):
+            value = gcoder.S(gline)
+            if value is not None:
+                if c in ("M140", "M190"):
+                    self.status.bed_temp_target = float(value)
+                elif "T" not in gline.raw.upper()[4:] or self.current_tool == 0:
+                    self.status.extruder_temp_target = float(value)
+                self._emit({"type": "state"})
+        elif c == "M106":
+            value = gcoder.S(gline)
+            self.fan = round(min(255, 255 if value is None else value) / 255 * 100)
+        elif c == "M107":
+            self.fan = 0
+        elif c.startswith("T") and c[1:].isdigit():
+            self.current_tool = int(c[1:])
+
+    def _extruder_count(self):
+        return max(1, int(self.settings.extruders or 1))
+
+    def _run_confirmed(self, fn):
+        self._confirmed = True
+        try:
+            fn()
+        finally:
+            self._confirmed = False
+
+    def set_temp(self, heater, value, confirmed=False):
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            self.logError("You must enter a temperature.")
+            return
+        text = "%g" % value
+        if heater == "bed":
+            self.run(lambda: self.do_bedtemp(text))
+        elif confirmed:
+            self.run(lambda: self._run_confirmed(lambda: self.do_settemp(text)))
+        else:
+            self.run(lambda: self.do_settemp(text))
+
+    def presets(self):
+        st = self.settings
+        return [{"name": m,
+                 "nozzle": float(getattr(st, "temperature_" + m.lower())),
+                 "bed": float(getattr(st, "bedtemp_" + m.lower()))} for m in MATERIALS]
+
+    def preheat(self, material):
+        preset = next((p for p in self.presets() if p["name"] == material), None)
+        if preset is None:
+            self.logError("Unknown material %s" % material)
+            return
+
+        def go():
+            if not self.p.online:
+                self.logError("Printer is not online.")
+                return
+            self.log("Preheating for %s" % material)
+            self._run_confirmed(lambda: self.do_settemp("%g" % preset["nozzle"]))
+            self.do_bedtemp("%g" % preset["bed"])
+        self.run(go)
+
+    def _all_heaters_off(self):
+        if self._extruder_count() > 1:
+            for tool in range(self._extruder_count()):
+                self.p.send_now("M104 T%d S0" % tool)
+        self.do_settemp("0")
+        self.do_bedtemp("0")
+
+    def heaters_off(self):
+        def go():
+            if not self.p.online:
+                self.logError("Printer is not online.")
+                return
+            self._all_heaters_off()
+            self.log("Heaters off.")
+        self.run(go)
+
+    def motors_off(self):
+        def go():
+            if not self.p.online:
+                self.logError("Printer is not online.")
+                return
+            self.p.send_now("M84")
+            self.log("Motors off.")
+        self.run(go)
+
+    def everything_off(self):
+        """Classic "Off": pause, motors, heaters, fan, power supply (M81)."""
+        def go():
+            if self._extruder_count() > 1 and self.p.online:
+                for tool in range(1, self._extruder_count()):
+                    self.p.send_now("M104 T%d S0" % tool)
+            self.off()
+        self.run(go)
+
+    def clear_all(self):
+        """Cancel the print, heaters + fan + motors off, unload the file."""
+        def go():
+            if self.p.online:
+                if self.sdprinting:
+                    self.p.send_now("M25")
+                elif self.p.printing or self.paused:
+                    self.p.cancelprint()
+                self.paused = False
+                self.sdprinting = False
+                self._all_heaters_off()
+                self.p.send_now("M107")
+                self.p.send_now("M84")
+            self.fgcode = None
+            self.filename = None
+            self.log("Cleared: print cancelled, heaters, fan and motors off, file unloaded.")
+        self.run(go)
+
+    def set_tool(self, tool):
+        self.run(lambda: self.do_tool(str(int(tool))))
+
+    def set_locked(self, locked):
+        self.locked = bool(locked)
+        self._emit({"type": "state"})
+
+    def startcb(self, resuming=False):
+        super().startcb(resuming)
+        if not resuming and self.settings.lockbox and self.settings.lockonstart:
+            self.set_locked(True)
+
+    def set_setting(self, name, value):
+        if name not in EDITABLE_SETTINGS:
+            self.logError("That setting can't be changed from here.")
+            return
+        self.run(lambda: self.do_set("%s %s" % (name, value)))
 
     def promptf(self):
         return ""
@@ -272,15 +476,36 @@ class WebHost(pronsole.pronsole):
                 "nozzle": s.extruder_temp, "nozzle_target": s.extruder_temp_target,
                 "bed": s.bed_temp, "bed_target": s.bed_temp_target,
             },
+            "fan": self.fan,
+            "tools": self.tool_temps if self._extruder_count() > 1 else {},
+            "extruders": self._extruder_count(),
+            "locked": self.locked,
+            "presets": self.presets(),
+            "high_nozzle": HIGH_NOZZLE_TEMP,
             "settings": {
                 "port": self.settings.port, "baudrate": self.settings.baudrate,
-                "dtr": bool(self.settings.dtr),
+                **{name: getattr(self.settings, name) for name in sorted(EDITABLE_SETTINGS)},
             },
         }
 
+    def settings_info(self):
+        """Labels/help/type for the settings the interface can edit."""
+        info = {}
+        for name in sorted(EDITABLE_SETTINGS):
+            st = getattr(self.settings, "_" + name)
+            kind = "bool" if isinstance(st, BooleanSetting) else "number" if isinstance(st, SpinSetting) else "text"
+            info[name] = {"label": (st.label or name).rstrip(":"), "help": st.help or "", "kind": kind,
+                          "group": st.group or "", "min": getattr(st, "min", None), "max": getattr(st, "max", None)}
+        return info
+
     def shutdown(self):
-        """Disconnect cleanly. Heaters are left exactly as they are."""
+        """Disconnect cleanly. Heaters are left as they are, unless the
+        "Turn heaters off when closing" setting is on."""
         try:
+            if self.settings.heaters_off_on_exit and self.p.online:
+                self.log("Turning heaters off (setting: turn heaters off when closing).")
+                self._all_heaters_off()
+                time.sleep(0.6)   # let the commands reach the printer
             self.p.disconnect()
         finally:
             self.kill()
