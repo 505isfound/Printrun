@@ -95,7 +95,7 @@ class Server:
     @web.middleware
     async def _guard(self, request, handler):
         if not self._authorized(request):
-            return web.Response(status=403, text="Open Pronterface Web from its app window.")
+            return web.Response(status=403, text="Open Layerline from its app window.")
         response = await handler(request)
         if request.query.get("key") == self.key:
             response.set_cookie(COOKIE, self.key, httponly=True, samesite="Strict")

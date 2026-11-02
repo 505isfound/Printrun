@@ -14,7 +14,7 @@ import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [os.path.join(HERE, "..", ".."), os.path.join(HERE, "..")]
 
-from pronterface_web.fake_printer import FakePrinter  # noqa: E402
+from layerline.fake_printer import FakePrinter  # noqa: E402
 
 
 def wait(cond, timeout=15):
@@ -32,7 +32,7 @@ def rig(tmp_path_factory):
     os.environ["HOME"] = str(home)
     os.environ["XDG_CONFIG_HOME"] = str(home / ".config")
     os.environ["XDG_CACHE_HOME"] = str(home / ".cache")
-    from pronterface_web.app import build
+    from layerline.app import build
     printer = FakePrinter()
     engine, server, url = build(0, [])
     yield printer, engine, server, url

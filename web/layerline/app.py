@@ -1,4 +1,4 @@
-"""Pronterface Web launcher: starts the engine and the local server, then
+"""Layerline launcher: starts the engine and the local server, then
 opens the interface in its own app window (or the browser as a fallback)."""
 
 import argparse
@@ -76,7 +76,7 @@ def selftest(result_file, rest):
         data = json.load(urllib.request.urlopen(url.replace("/?", "/api/initial?"), timeout=10))
         check("web server answers", "state" in data)
         page = urllib.request.urlopen(url, timeout=10).read().decode()
-        check("interface page served", "Pronterface Web" in page)
+        check("interface page served", "Layerline" in page)
         engine.connect(fp.address, 115200)
         t = time.time()
         while not engine.p.online and time.time() - t < 15:
@@ -109,7 +109,7 @@ def main(argv=None):
     _ensure_streams()
     opts, rest = parse_args(sys.argv[1:] if argv is None else argv)
     if opts.version:
-        print("Pronterface Web", __version__)
+        print("Layerline", __version__)
         return 0
     if opts.selftest:
         return selftest(opts.selftest, rest)
@@ -137,7 +137,7 @@ def main(argv=None):
             webview = None
 
     if webview is not None:
-        window = webview.create_window("Pronterface Web", url, width=1280, height=820,
+        window = webview.create_window("Layerline", url, width=1280, height=820,
                                        min_size=(900, 600), background_color="#F2F2F7")
 
         def on_closing():
@@ -151,7 +151,7 @@ def main(argv=None):
         webview.start(private_mode=False)
     else:
         webbrowser.open(url)
-        print("Pronterface Web is running at", url)
+        print("Layerline is running at", url)
         try:
             while not quit_event.wait(0.5):
                 pass

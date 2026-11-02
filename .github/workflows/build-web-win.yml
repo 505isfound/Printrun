@@ -1,4 +1,4 @@
-name: Build Pronterface Web (Windows)
+name: Build Layerline (Windows)
 
 on:
   push:
@@ -33,25 +33,25 @@ jobs:
     - name: Build the app
       run: >
         pyinstaller --clean -y -F -w
-        --name "PronterfaceWeb"
+        --name "Layerline"
         -i "./assets_raw/icons/pronterface.ico"
         --paths web --paths .
-        --add-data "web/pronterface_web/static;pronterface_web/static"
+        --add-data "web/layerline/static;layerline/static"
         --add-data "printrun/assets;printrun/assets"
         --collect-submodules printrun
-        --collect-submodules pronterface_web
+        --collect-submodules layerline
         --collect-all webview
-        pronterfaceweb.py
+        start_layerline.py
 
     - name: Self-test the built app against a simulated printer
       shell: pwsh
       run: |
-        $p = Start-Process -FilePath "dist\PronterfaceWeb.exe" -ArgumentList "--selftest","selftest.txt" -Wait -PassThru
+        $p = Start-Process -FilePath "dist\Layerline.exe" -ArgumentList "--selftest","selftest.txt" -Wait -PassThru
         Get-Content selftest.txt
         if ($p.ExitCode -ne 0) { throw "Self-test failed (exit $($p.ExitCode))" }
 
     - name: Upload the app
       uses: actions/upload-artifact@v7
       with:
-        name: PronterfaceWeb-windows
-        path: dist/PronterfaceWeb.exe
+        name: Layerline-windows
+        path: dist/Layerline.exe

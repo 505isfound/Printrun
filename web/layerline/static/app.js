@@ -1,4 +1,4 @@
-// Pronterface Web interface (Phase 0: connection, temperatures, console)
+// Layerline interface (Phase 0: connection, temperatures, console)
 "use strict";
 
 const $ = (id) => document.getElementById(id);

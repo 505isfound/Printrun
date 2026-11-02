@@ -5,7 +5,7 @@ TCP port and answers like Marlin does over USB: "start" greeting, "ok" after
 every command, temperature reports for M105, firmware info for M115, position
 for M114. Heaters warm up / cool down gradually so graphs and status look real.
 
-Run it on its own:   python -m pronterface_web.fake_printer 5555   (from the web/ folder)
+Run it on its own:   python -m layerline.fake_printer 5555   (from the web/ folder)
 Then connect to:     127.0.0.1:5555
 """
 

@@ -1,4 +1,4 @@
-# Pronterface Web: Feature Checklist & Build Plan
+# Project Layerline: Feature Checklist & Build Plan
 
 The "nothing lost" list for rebuilding Pronterface with a modern web-based interface.
 Every feature of the current Pronterface is listed here. A phase isn't done until every
@@ -187,4 +187,4 @@ Printer ──USB── PC ┬─ Engine: Pronterface's own host code (pronsole 
 1. **Phase 8 niche tools:** skipped (decided 2026-11-01). STL plater, old Slic3r integration and
    the resin projector stay available in classic Pronterface.
 2. **Test printer:** Creality Ender 5 Pro (Keegan's only printer).
-3. **Name:** "Pronterface Web" for now; a new name is still to be picked.
+3. **Name:** "Layerline" (project: "Project Layerline"), decided 2026-11-01.
