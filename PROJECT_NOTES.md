@@ -26,5 +26,19 @@ Running notes so any new Claude chat can pick up where we left off.
 - On Windows, some native controls (buttons, dropdown arrows) may stay light in dark mode; wxPython's Windows dark-mode support is limited.
 - The toolbar's original "Off" button also sends M81 (power supply off). Left as-is.
 
+## Direction (decided 2026-11-01)
+- **Rebuilding Pronterface with a web-based interface** ("Pronterface Web", working name), iOS-like look.
+  Runs locally; LAN access opt-in with PIN later. No public internet exposure planned.
+- Goals in Keegan's words: keep as much of the original as possible, no new bugs, no lost
+  functionality, no lost printer compatibility. Webcam support wanted.
+- Engine = existing `pronsole` + `printcore` + `gcoder`, unchanged. New code goes in `web/`.
+- Full plan + "nothing lost" list: **FEATURE_CHECKLIST.md** (89 items, Phases 0-8).
+- Approved: redesigned temperature graph (mockup: thick actual line, dashed target, nozzle blue /
+  bed orange, readouts on top; expanded view with 1/5/15 min, time labels, separate fan strip;
+  drop the overlapping shaded fills).
+- Testing rule: test G-code uses the printer's firmware settings, nothing overridden.
+
 ## Open questions / next steps
-- Keegan to test the Windows build with the real printer.
+- Keegan to test the Windows build of the classic-Pronterface changes with the real printer.
+- Decisions in FEATURE_CHECKLIST.md: niche Phase 8 tools, which printer(s) to test on, app name.
+- Next: start Phase 0 (foundation).
