@@ -43,7 +43,8 @@ Running notes so any new Claude chat can pick up where we left off.
 - Phase 0 done (2026-11-01): tested by Keegan on the Ender 5 Pro. Auto-detect found the printer, window opened,
   M115/help/heat test worked.
 - Phase 1 built (2026-11-02): temps & safety, new graph, status strip, settings sheet, lock, multi-extruder.
-  Passing on simulated printer (18 pytest + 13 + 16 browser checks). Waiting on Keegan's real-printer test.
+  Keegan tested on the Ender 5 Pro 2026-11-01: all good (incl. graph in its own window). 'Turn everything off'
+  button removed at his request. Multi-extruder only verified on the simulator.
 - Repo rename to `505isfound/Layerline` is up to Keegan (GitHub settings writes are blocked from Claude's session);
   after renaming, re-attach the repo under the new name.
 
